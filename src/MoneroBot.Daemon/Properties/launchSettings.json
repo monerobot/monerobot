@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "MoneroBot.Daemon": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
