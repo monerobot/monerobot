@@ -60,12 +60,7 @@
 			<yjs:Stroke x:Key="12" fill="#FF57DE8C"/>
 			<yjs:SolidColorFill x:Key="13" color="#FF57DE8C"/>
 			<y:FreeNodePortLocationModelParameter x:Key="14" Ratio="0.5,0.987012987012987"/>
-			<yjs:DefaultLabelStyle x:Key="15" verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE">
-				<yjs:DefaultLabelStyle.font>
-					<yjs:Font fontSize="12" fontFamily="'Arial'"/>
-				</yjs:DefaultLabelStyle.font>
-			</yjs:DefaultLabelStyle>
-			<yjs:Stroke x:Key="16" fill="WHITE" thickness="1.5"/>
+			<yjs:Stroke x:Key="15" fill="WHITE" thickness="1.5"/>
 		</y:SharedData>
 	</data>
 	<graph id="G" edgedefault="directed">
@@ -85,7 +80,7 @@
 				</x:List>
 			</data>
 			<data key="d5">
-				<y:RectD X="-52.5" Y="-348" Width="157" Height="75"/>
+				<y:RectD X="-52.5" Y="-356" Width="157" Height="75"/>
 			</data>
 			<data key="d7">
 				<yjs:ShapeNodeStyle stroke="{y:GraphMLReference 5}" fill="{y:GraphMLReference 6}"/>
@@ -163,7 +158,7 @@
 				</x:List>
 			</data>
 			<data key="d5">
-				<y:RectD X="377" Y="-212" Width="195" Height="75"/>
+				<y:RectD X="424" Y="-212" Width="195" Height="75"/>
 			</data>
 			<data key="d7">
 				<yjs:ShapeNodeStyle stroke="#FF0078FF" fill="#FF0078FF"/>
@@ -401,7 +396,7 @@
 		<edge id="e0" source="n2" target="n1" sourceport="p2" targetport="p3">
 			<data key="d11">
 				<x:List>
-					<y:Label Style="{y:GraphMLReference 15}">
+					<y:Label>
 						<y:Label.Text><![CDATA[RPC Server Opened With Wallet File]]></y:Label.Text>
 						<y:Label.LayoutParameter>
 							<y:SmartEdgeLabelModelParameter Distance="5">
@@ -410,6 +405,13 @@
 								</y:SmartEdgeLabelModelParameter.Model>
 							</y:SmartEdgeLabelModelParameter>
 						</y:Label.LayoutParameter>
+						<y:Label.Style>
+							<yjs:DefaultLabelStyle verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE" textSize="14">
+								<yjs:DefaultLabelStyle.font>
+									<yjs:Font fontSize="14" fontFamily="'Arial'"/>
+								</yjs:DefaultLabelStyle.font>
+							</yjs:DefaultLabelStyle>
+						</y:Label.Style>
 					</y:Label>
 				</x:List>
 			</data>
@@ -434,7 +436,7 @@
 		<edge id="e1" source="n0" target="n1" sourceport="p1" targetport="p4">
 			<data key="d11">
 				<x:List>
-					<y:Label Style="{y:GraphMLReference 15}">
+					<y:Label>
 						<y:Label.Text><![CDATA[RPC Server Connects to Monero Node]]></y:Label.Text>
 						<y:Label.LayoutParameter>
 							<y:SmartEdgeLabelModelParameter SegmentRatio="0.42567567567567566" Distance="5">
@@ -443,16 +445,23 @@
 								</y:SmartEdgeLabelModelParameter.Model>
 							</y:SmartEdgeLabelModelParameter>
 						</y:Label.LayoutParameter>
+						<y:Label.Style>
+							<yjs:DefaultLabelStyle verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE" textSize="14">
+								<yjs:DefaultLabelStyle.font>
+									<yjs:Font fontSize="14" fontFamily="'Arial'"/>
+								</yjs:DefaultLabelStyle.font>
+							</yjs:DefaultLabelStyle>
+						</y:Label.Style>
 					</y:Label>
 				</x:List>
 			</data>
 			<data key="d13">
-				<yjs:PolylineEdgeStyle stroke="{y:GraphMLReference 16}">
+				<yjs:PolylineEdgeStyle stroke="{y:GraphMLReference 15}">
 					<yjs:PolylineEdgeStyle.targetArrow>
 						<yjs:Arrow type="SHORT" scale="1.5" stroke="#FFFFFFFF" fill="WHITE" cropLength="1"/>
 					</yjs:PolylineEdgeStyle.targetArrow>
 					<yjs:PolylineEdgeStyle.sourceArrow>
-						<yjs:Arrow type="NONE" scale="1.5" stroke="{y:GraphMLReference 16}" fill="#FFFFFFFF"/>
+						<yjs:Arrow type="NONE" scale="1.5" stroke="{y:GraphMLReference 15}" fill="#FFFFFFFF"/>
 					</yjs:PolylineEdgeStyle.sourceArrow>
 				</yjs:PolylineEdgeStyle>
 			</data>
@@ -460,11 +469,18 @@
 		<edge id="e2" source="n1" target="n3::n1" sourceport="p8" targetport="p6">
 			<data key="d11">
 				<x:List>
-					<y:Label Style="{y:GraphMLReference 15}">
-						<y:Label.Text><![CDATA[Bounty Uses RPC to Scan For Contributions]]></y:Label.Text>
+					<y:Label>
+						<y:Label.Text><![CDATA[Bounty Service Uses RPC to Scan For Contributions]]></y:Label.Text>
 						<y:Label.LayoutParameter>
-							<y:FreeEdgeLabelModelParameter Ratio="0.9402076794935956" Distance="-113.6902940932684"/>
+							<y:FreeEdgeLabelModelParameter Ratio="1.054661676161932" Distance="-143.24977055751856"/>
 						</y:Label.LayoutParameter>
+						<y:Label.Style>
+							<yjs:DefaultLabelStyle verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE" textSize="14">
+								<yjs:DefaultLabelStyle.font>
+									<yjs:Font fontSize="14" fontFamily="'Arial'"/>
+								</yjs:DefaultLabelStyle.font>
+							</yjs:DefaultLabelStyle>
+						</y:Label.Style>
 					</y:Label>
 				</x:List>
 			</data>
@@ -489,11 +505,18 @@
 		<edge id="e3" source="n1" target="n3::n0" sourceport="p9" targetport="p6">
 			<data key="d11">
 				<x:List>
-					<y:Label Style="{y:GraphMLReference 15}">
-						<y:Label.Text><![CDATA[Registration Uses RPC to Determine Donation Address]]></y:Label.Text>
+					<y:Label>
+						<y:Label.Text><![CDATA[Registration Service Uses RPC to Determine Donation Address]]></y:Label.Text>
 						<y:Label.LayoutParameter>
-							<y:FreeEdgeLabelModelParameter Ratio="1.0253144975290305" Distance="135.67041761796864"/>
+							<y:FreeEdgeLabelModelParameter Ratio="1.1632462371036922" Distance="171.2933764338598"/>
 						</y:Label.LayoutParameter>
+						<y:Label.Style>
+							<yjs:DefaultLabelStyle verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE" textSize="14">
+								<yjs:DefaultLabelStyle.font>
+									<yjs:Font fontSize="14" fontFamily="'Arial'"/>
+								</yjs:DefaultLabelStyle.font>
+							</yjs:DefaultLabelStyle>
+						</y:Label.Style>
 					</y:Label>
 				</x:List>
 			</data>
@@ -518,11 +541,18 @@
 		<edge id="e4" source="n4" target="n3::n1" sourceport="p11" targetport="p8">
 			<data key="d11">
 				<x:List>
-					<y:Label Style="{y:GraphMLReference 15}">
-						<y:Label.Text><![CDATA[Comments Area Created/Updated]]></y:Label.Text>
+					<y:Label>
+						<y:Label.Text><![CDATA[Comments Are Created/Updated]]></y:Label.Text>
 						<y:Label.LayoutParameter>
 							<y:FreeEdgeLabelModelParameter Ratio="1.0968018406173854" Distance="89.65768810822722"/>
 						</y:Label.LayoutParameter>
+						<y:Label.Style>
+							<yjs:DefaultLabelStyle verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE" textSize="14">
+								<yjs:DefaultLabelStyle.font>
+									<yjs:Font fontSize="14" fontFamily="'Arial'"/>
+								</yjs:DefaultLabelStyle.font>
+							</yjs:DefaultLabelStyle>
+						</y:Label.Style>
 					</y:Label>
 				</x:List>
 			</data>
@@ -547,11 +577,18 @@
 		<edge id="e5" source="n4" target="n3::n0" sourceport="p10" targetport="p7">
 			<data key="d11">
 				<x:List>
-					<y:Label Style="{y:GraphMLReference 15}">
+					<y:Label>
 						<y:Label.Text><![CDATA[Donation Address Comment Created]]></y:Label.Text>
 						<y:Label.LayoutParameter>
-							<y:FreeEdgeLabelModelParameter Ratio="1.1121911153337771" Distance="-88.77658995690133"/>
+							<y:FreeEdgeLabelModelParameter Ratio="1.1751172044789444" Distance="-98.87396257420349"/>
 						</y:Label.LayoutParameter>
+						<y:Label.Style>
+							<yjs:DefaultLabelStyle verticalTextAlignment="BOTTOM" horizontalTextAlignment="CENTER" textFill="WHITE" textSize="14">
+								<yjs:DefaultLabelStyle.font>
+									<yjs:Font fontSize="14" fontFamily="'Arial'"/>
+								</yjs:DefaultLabelStyle.font>
+							</yjs:DefaultLabelStyle>
+						</y:Label.Style>
 					</y:Label>
 				</x:List>
 			</data>
