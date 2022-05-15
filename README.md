@@ -29,7 +29,7 @@ appropriate.
 The `appsettings.json` file can be modified and placed alongside the executable to configure the daemon. The
 following settings are available:
 
-```json
+```jsonc
 {
   "ConnectionStrings": {
     // The sqlite database in which the bot's state is stored.
