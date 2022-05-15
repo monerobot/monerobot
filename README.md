@@ -22,7 +22,11 @@ made because the existing code stopped working and is no longer maintained.
 ## Usage
 
 Build/download the monero bounty bot daemon binaries appropriate to your platform and then modify the `appsettings.json` file as
-appropriate.
+appropriate. The daemon program itself expects you to have configured/have running the following APIs/services:
+
+1. A [Fider](https://fider.io/) instance.
+2. A [Monero Wallet RPC Server](https://www.getmonero.org/resources/developer-guides/wallet-rpc.html) instance which was launched with the `--wallet-file` argument pointing
+to the managed donation wallet.
 
 ## Configuration
 
