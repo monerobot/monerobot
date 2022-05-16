@@ -42,7 +42,7 @@ internal class BountyContributionService : IHostedService, IDisposable
 
     public async Task StartAsync(CancellationToken token)
     {
-        this.logger.LogInformation("Bounty contribution service has started");
+        this.logger.LogInformation("The bounty contribution service which scans for donations has started");
 
         this.context = await this.contextFactory.CreateDbContextAsync(token);
         this.cts = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -63,9 +63,9 @@ internal class BountyContributionService : IHostedService, IDisposable
             var token = this.cts?.Token ?? default;
             await this.ScanForContributions(token);
         }
-        catch (Exception error)
+        catch (Exception exception)
         {
-            this.logger.LogCritical("Unhandled exception occured whilst scanning for contributions: {error}", error);
+            this.logger.LogCritical("An unhandled exception occured whilst scanning for contributions: {exception}", exception);
         }
         finally
         {
@@ -85,6 +85,12 @@ internal class BountyContributionService : IHostedService, IDisposable
 
         foreach (var (bounty, transfers) in incomingTransfers)
         {
+            this.logger.LogTrace(
+                "Detected {transfers_count} transfers to {donation_address} for post #{post_number}",
+                transfers.Count,
+                bounty.SubAddress,
+                bounty.PostNumber);
+
             foreach (var transfer in transfers.OrderBy(t => t.BlockHeight).ThenBy(t => t.TxHash))
             {
                 try
@@ -94,7 +100,7 @@ internal class BountyContributionService : IHostedService, IDisposable
                 catch (Exception error)
                 {
                     this.logger.LogCritical(
-                        "An unhandled exception occured whilst trying to synchronize post #{number} with the transfer {transaction}: {error}",
+                        "An unhandled exception occured whilst trying to synchronize post #{post_number} with the transfer {tx_hash}: {error}",
                         bounty.PostNumber,
                         transfer.TxHash,
                         error);
@@ -111,7 +117,7 @@ internal class BountyContributionService : IHostedService, IDisposable
             if (contribution.BountyId != bounty.Id)
             {
                 this.logger.LogCritical(
-                    "Somehow the transfer {transfer} was associated with the wrong bounty - it was associated with post #{actual} but it was expected to be associated with post #{expected}",
+                    "Somehow the transfer {tx_hash} was associated with the wrong bounty - it was associated with post #{actual_post_number} but it was expected to be associated with post #{expected_post_number}",
                     transfer.TxHash,
                     contribution.BountyId,
                     bounty.Id);
@@ -148,16 +154,23 @@ internal class BountyContributionService : IHostedService, IDisposable
         if (createCommentResponse.Error is { } createCommentErr)
         {
             this.logger.LogCritical(
-                "Failed to create contribution recieved comment for transfer {transaction} beloning to post #{number}",
+                "Failed to create contribution recieved comment for transfer {tx_hash} beloning to post #{post_number}: {@fider_error}",
                 transfer.TxHash,
-                bounty.PostNumber);
-            createCommentErr.Log(this.logger, LogLevel.Critical);
+                bounty.PostNumber,
+                createCommentErr);
             return false;
         }
 
         contribution.CommentId = createCommentResponse.Result;
         await this.context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        this.logger.LogInformation(
+            "Created contribution for post #{post_number} using transfer {@transfer} and posted comment {comment_id}",
+            bounty.PostNumber,
+            transfer,
+            contribution.CommentId);
+
         return true;
     }
 
@@ -173,7 +186,7 @@ internal class BountyContributionService : IHostedService, IDisposable
         if (contribution.Transaction!.TransactionId != transfer.TxHash)
         {
             this.logger.LogCritical(
-                "Attempted to update the transfer {transaction} which is a contribution to post #{number} with the details of a different transaction {other_transaction}",
+                "Attempted to update the transfer {tx_hash} which is a contribution to post #{post_number} with the details of a different transaction {other_tx_hash}",
                 contribution.Transaction.TransactionId,
                 bounty.PostNumber,
                 transfer.TxHash);
@@ -188,7 +201,7 @@ internal class BountyContributionService : IHostedService, IDisposable
         if (!changed)
         {
             this.logger.LogTrace(
-                "No changes detected for transaction {transaction} beloning to post #{number}",
+                "No changes detected for transaction {tx_hash} beloning to post #{post_number}",
                 transfer.TxHash,
                 bounty.PostNumber);
             return true;
@@ -204,12 +217,18 @@ internal class BountyContributionService : IHostedService, IDisposable
         if (updateCommentResposne.Error is { } updateCommentErr)
         {
             this.logger.LogCritical(
-                "Failed to update contribution comment for transfer {transaction} beloning to post #{number}",
+                "Failed to update contribution comment for transfer {tx_hash} beloning to post #{post_number}: {@fider_error}",
                 transfer.TxHash,
-                bounty.PostNumber);
-            updateCommentErr.Log(this.logger, LogLevel.Critical);
+                bounty.PostNumber,
+                updateCommentErr);
             return false;
         }
+
+        this.logger.LogInformation(
+            "Updated contribution for post #{post_number} using transfer {@transfer} and updated comment {comment_id}",
+            bounty.PostNumber,
+            transfer,
+            contribution.CommentId);
 
         await this.context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -296,7 +315,7 @@ internal class BountyContributionService : IHostedService, IDisposable
         foreach (var (accountIndex, bounties) in bountiesByAccountNumber)
         {
             this.logger.LogInformation(
-                "Fetching incoming transfers for wallet (account #{account}) which has {count} associated bounties",
+                "Fetching incoming transfers for wallet (account #{account_index}) which has {bounties_count} associated bounties",
                 accountIndex,
                 bounties.Count);
 
@@ -313,27 +332,21 @@ internal class BountyContributionService : IHostedService, IDisposable
             if (getIncomingTransfersResponse.Error is { } getIncomingTransfersErr)
             {
                 this.logger.LogCritical(
-                    "Failed to retrieve incoming transfers for wallet (account #{account}) which has {count} associated bounties: ({code}) {message}",
+                    "Failed to retrieve incoming transfers for wallet (account #{account_index}) which has {bounties_count} associated bounties: {@wallet_rpc_error}",
                     accountIndex,
                     bounties.Count,
-                    getIncomingTransfersErr.Code,
-                    getIncomingTransfersErr.Message);
+                    getIncomingTransfersErr);
                 continue;
             }
 
             if (getIncomingTransfersResponse.Result is null)
             {
                 this.logger.LogCritical(
-                    "Failed to retrieve incoming transfers for wallet (account #{account}) which has {count} associated bounties - the RPC server returned an error but it had no results",
+                    "Failed to retrieve incoming transfers for wallet (account #{account_index}) which has {bounties_count} associated bounties - the RPC server returned a response but it was empty",
                     accountIndex,
                     bounties.Count);
                 continue;
             }
-
-            this.logger.LogInformation(
-                "Successfully retrieved incoming transfers for wallet (account #{account}) which has {count} associated bounties",
-                accountIndex,
-                bounties.Count);
 
             var transfersByAddress = (getIncomingTransfersResponse.Result.Transfers ?? new ())
                 .ToLookup(t => new { AccountIndex = t.SubaddrIndex.Major, SubAddressIndex = t.SubaddrIndex.Minor });
@@ -341,11 +354,6 @@ internal class BountyContributionService : IHostedService, IDisposable
             {
                 var address = new { bounty.AccountIndex, bounty.SubAddressIndex };
                 var transfers = transfersByAddress[address].ToList();
-                this.logger.LogTrace(
-                    "Detected #{transfers} for post #{number} ({address})",
-                    transfers.Count,
-                    bounty.PostNumber,
-                    bounty.SubAddress);
                 results.Add((bounty, transfers));
             }
         }

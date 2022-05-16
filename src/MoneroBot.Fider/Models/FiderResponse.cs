@@ -11,21 +11,9 @@ public record FiderResponse<T>(T? Result, Err? Error)
 
 public record Unit();
 
-public abstract record Err()
-{
-    public virtual void Log(ILogger logger, LogLevel level)
-    {
-        logger.Log(level, this.GetType().Name);
-    }
-}
+public abstract record Err();
 
-public record BadRequest(Error[] Errors) : Err
-{
-    public override void Log(ILogger logger, LogLevel level)
-    {
-        logger.Log(level, "Bad Request: {errors}", this.Errors);
-    }
-}
+public record BadRequest(Error[] Errors) : Err;
 
 public record Forbidden() : Err;
 
@@ -35,10 +23,4 @@ public record InternalError() : Err;
 
 public record MalformedResponse() : Err;
 
-public record UnkownError(HttpStatusCode StatusCode, string? Message) : Err
-{
-    public override void Log(ILogger logger, LogLevel level)
-    {
-        logger.Log(level, "Unkown API Error ({status}): {message}", this.StatusCode, this.Message);
-    }
-}
+public record UnkownError(HttpStatusCode StatusCode, string? Message) : Err;

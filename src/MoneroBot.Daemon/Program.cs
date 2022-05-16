@@ -23,8 +23,7 @@ var host = Host.CreateDefaultBuilder(args)
     {
         logging
             .ReadFrom.Configuration(provider.Configuration)
-            .Enrich.FromLogContext()
-            .WriteTo.Console();
+            .Enrich.FromLogContext();
     })
     .ConfigureServices(services =>
     {

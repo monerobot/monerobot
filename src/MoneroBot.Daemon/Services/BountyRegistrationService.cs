@@ -40,7 +40,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
 
     public Task StartAsync(CancellationToken token)
     {
-        this.logger.LogInformation("Bounty registration service has started");
+        this.logger.LogInformation("The Bounty registration service which creates bounties for posts has started");
 
         this.cts = CancellationTokenSource.CreateLinkedTokenSource(token);
         this.timer = new (this.Tick, null, 0, Timeout.Infinite);
@@ -62,9 +62,9 @@ internal class BountyRegistrationService : IHostedService, IDisposable
             var token = this.cts?.Token ?? default;
             await this.PerformRegistrations(token);
         }
-        catch (Exception error)
+        catch (Exception exception)
         {
-            this.logger.LogCritical("Unhandled exception occured whilst performing registrations: {error}", error);
+            this.logger.LogCritical("An unhandled exception occured whilst performing registrations: {exception}", exception);
         }
         finally
         {
@@ -75,12 +75,12 @@ internal class BountyRegistrationService : IHostedService, IDisposable
 
     private async Task PerformRegistrations(CancellationToken token = default)
     {
-        this.logger.LogTrace("Performing bountry registration");
+        this.logger.LogTrace("Scanning for posts to register bounties for");
 
         var maybePosts = await this.TryGetPostsToRegisterAsync(token);
         if (maybePosts.TryUnwrapValue(out var posts) is false)
         {
-            this.logger.LogTrace("No posts to register, halting registration process");
+            this.logger.LogTrace("No posts to register at this time");
             return;
         }
 
@@ -88,7 +88,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         {
             token.ThrowIfCancellationRequested();
 
-            this.logger.LogTrace("Beginning transaction to register post #{number}", post.Number);
+            this.logger.LogTrace("Attemping to register post {@post}", post);
 
             using var transaction = await this.context.Database.BeginTransactionAsync(token);
             try
@@ -96,28 +96,29 @@ internal class BountyRegistrationService : IHostedService, IDisposable
                 var maybeAddress = await this.TryCreateAddressForPostAsync(post, token);
                 if (maybeAddress.TryUnwrapValue(out var address))
                 {
-                    this.logger.LogInformation("Using address ({address}, {index}) for post #{number}", address.Address, address.Index, post.Number);
+                    this.logger.LogInformation("Using {@address} as the donation address for post @{post}", address, post);
                 }
                 else
                 {
-                    this.logger.LogCritical("Failed to create address for post #{number}, skipping registration.", post.Number);
+                    this.logger.LogCritical("Failed to create address for {@post}, skipping registration.", post);
                     continue;
                 }
 
-                if (await this.TryLabelAddressForPost(post, address) is false)
+                var label = $"Post #{post.Number} - {post.Title.Substring(0, Math.Min(post.Title.Length, 30))}...";
+                if (await this.TryApplyLabelAddressForPost(post, label, address) is false)
                 {
-                    this.logger.LogCritical("Failed to apply label to address for post #{number}, skipping registration", post.Number);
+                    this.logger.LogCritical(
+                        "Failed to apply label {address_label} to {@address} for {@post}",
+                        label,
+                        address,
+                        post);
                     continue;
                 }
 
-                var maybeCommentId = await this.TryPostDontaionCommentForPostAsync(post, address.Address);
-                if (maybeCommentId.TryUnwrapValue(out var commentId))
+                var maybeCommentId = await this.TryCreateDontaionAddressCommentForPostAsync(post, address.Address);
+                if (maybeCommentId.TryUnwrapValue(out var commentId) is false)
                 {
-                    this.logger.LogInformation("Successfully posted comment with the donation address for post #{number}", post.Number);
-                }
-                else
-                {
-                    this.logger.LogCritical("Failed to post a comment with the dontaion link for post #{number}, skipping registration", post.Number);
+                    this.logger.LogCritical("Failed to create a donation address comment for {@post}", post);
                     return;
                 }
 
@@ -131,17 +132,17 @@ internal class BountyRegistrationService : IHostedService, IDisposable
                 await this.context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                this.logger.LogInformation("Registered post #{number}", post.Number);
+                this.logger.LogInformation("Successfully registered {@post}", post);
             }
-            catch (Exception error)
+            catch (Exception exception)
             {
-                this.logger.LogCritical("Unhandled exception occured while trying to register post #{number}: {error}", post.Number, error);
+                this.logger.LogCritical("An unhandled exception occured whilst trying to register {@post}: {error}", post, exception);
                 transaction.Rollback();
             }
         }
     }
 
-    private async Task<Option<int>> TryPostDontaionCommentForPostAsync(Post post, string address, CancellationToken token = default)
+    private async Task<Option<int>> TryCreateDontaionAddressCommentForPostAsync(Post post, string address, CancellationToken token = default)
     {
         var paymentUrl = $"monero:{address}";
         var qrCode = new PngByteQRCode(GenerateQrCode(paymentUrl, ECCLevel.M));
@@ -160,18 +161,20 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         var response = await this.fiderApi.PostCommentAsync(post.Number, content, new () { attachment });
         if (response.Error is { } err)
         {
-            this.logger.LogError("Failed to post dontaion comment for post #{number}", post.Number);
-            err.Log(this.logger, LogLevel.Critical);
+            this.logger.LogError("Failed to create dontaion address comment for {@post}: {@fider_error}", post, err);
             return Option.None<int>();
         }
 
-        this.logger.LogInformation("Successfully posted donation comment for post #{number}", post.Number);
+        this.logger.LogInformation(
+            "Successfully created a donation address comment ({comment_id}) {@comment} for post {@post}",
+            response.Result,
+            new { PaymentUrl = paymentUrl, Content = content, Attachement = attachment },
+            post);
         return Option.Some(response.Result);
     }
 
-    private async Task<bool> TryLabelAddressForPost(Post post, (string Address, uint Index) address, CancellationToken token = default)
+    private async Task<bool> TryApplyLabelAddressForPost(Post post, string label, (string Address, uint Index) address, CancellationToken token = default)
     {
-        var label = $"Post #{post.Number} - {post.Title.Substring(0, Math.Min(post.Title.Length, 30))}...";
         var labelAddressRequest = new MoneroRpcRequest(
             "label_address",
             new LabelAddressParameters(new (major: this.options.WalletAccountIndex, minor: address.Index), label: label));
@@ -180,18 +183,18 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         if (labelAddressResponse.Error is { } err)
         {
             this.logger.LogCritical(
-                "Failed to apply label '{label}' to address {address} post post #{number}",
+                "Failed to apply label {label} to {@address} for {@post}",
                 label,
-                address.Address,
-                post.Number);
+                address,
+                post);
             return false;
         }
 
         this.logger.LogInformation(
-            "Applied label '{label}' to address {address} post post #{number}",
+            "Applied label {label} to {@address} for {@post}",
             label,
-            address.Address,
-            post.Number);
+            address,
+            post);
         return true;
     }
 
@@ -208,22 +211,21 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         if (getAddressResponse.Error is { } getAddressErr)
         {
             this.logger.LogCritical(
-                "Failed to retrieve the address of account #{account} at index {index} which was to be used for post {number}: ({code}) {message}",
+                "Failed to retrieve the the address beloning to account #{account_number} at index {address_index} which is the preferred donation address for post {@post}: {@wallet_rpc_error}",
                 accountIndex,
                 addressIndex,
-                post.Number,
-                getAddressErr.Code,
-                getAddressErr.Message);
+                post,
+                getAddressErr);
             return Option.None<(string Address, uint Index)>();
         }
 
         if (getAddressResponse.Result is null || getAddressResponse.Result.Addresses?.Count is not > 0)
         {
             this.logger.LogCritical(
-                "Failed to retrieve the address of account #{account} at index {index} which was to be used for post {number} - the RPC server responded but with no result",
+                "Failed to retrieve the the address beloning to account #{account_number} at index {address_index} which is the preferred donation address for post {@post} - the RPC server responded but with no result",
                 accountIndex,
                 addressIndex,
-                post.Number);
+                post);
             return Option.None<(string Address, uint Index)>();
         }
 
@@ -236,11 +238,10 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         if (getBalanceResponse.Error is { } getBalanceErr)
         {
             this.logger.LogCritical(
-                "Failed to get the balance of address {address} which is required to verify it is not in used so that it can be used fort post {number}: ({code}) {message}",
+                "Failed to get the balance of the preferred donation address {address} which is required to verify that it is not already in use, so that it can be used as the donation address for {@post}: {@wallet_rpc_error}",
                 preferredAddress.Address,
-                post.Number,
-                getBalanceErr.Code,
-                getBalanceErr.Message);
+                post,
+                getBalanceErr);
             return Option.None<(string Address, uint Index)>();
         }
 
@@ -251,30 +252,33 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         if (preferredAddressBalance is null)
         {
             this.logger.LogCritical(
-                "Failed to get the balance of address {address} which is required to verify it is not in used so that it can be used fort post {number} - the RPC server responded but with no result",
+                "Failed to get the balance of the preferred donation address {address} which is required to verify that it is not already in use, so that it can be used as the donation address for {@post} - the RPC server responded but with no result",
                 preferredAddress.Address,
-                post.Number);
+                post);
             return Option.None<(string Address, uint Index)>();
         }
 
         if (preferredAddressBalance.Balance is > 0)
         {
             this.logger.LogWarning(
-                "The preferred address {address} for post #{number} is already in use with a balance of {balance}",
+                "The preferred donation address {address} for {@post} is already in use with a balance of {@balance}",
                 preferredAddress.Address,
                 post.Number,
-                preferredAddressBalance.Balance);
+                preferredAddressBalance);
         }
         else
         {
-            this.logger.LogInformation("The preferred address {address} for post #{number} is available", preferredAddress.Address, post.Number);
+            this.logger.LogInformation(
+                "The preferred donation address {address} for {@post} is available",
+                preferredAddress.Address,
+                post);
             return Option.Some((preferredAddress.Address, preferredAddress.AddressIndex));
         }
 
         this.logger.LogWarning(
-            "The preferred address {address} for post #{number} is not availlable and so a 'random' address will be generated for use",
+            "The preferred donation address {address} for {@post} is not availlable and so fallback address will be generated for use",
             preferredAddress.Address,
-            post.Number);
+            post);
 
         /* after we enter the fallback zone we cannot 'cancel' the task, otherwise we risk creating addresses that
          * never get used...
@@ -287,27 +291,26 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         if (createFallbackAddressResponse.Error is { } createFallbackErr)
         {
             this.logger.LogCritical(
-                "Failed to create a fallback address for post #{number}: ({code}) {message}",
+                "Failed to create a fallback donation address for {@post}: {@wallet_rpc_error}",
                 post.Number,
-                createFallbackErr.Code,
-                createFallbackErr.Message);
+                createFallbackErr);
         }
 
         if (createFallbackAddressResponse.Result is null
             || createFallbackAddressResponse.Result.Addresses?.Count is not > 0
             || createFallbackAddressResponse.Result.AddressIndices?.Count is not > 0)
         {
-            this.logger.LogCritical("Failed to create a fallback address for post #{number} - the RPC server responded but with no result", post.Number);
+            this.logger.LogCritical("Failed to create a fallback address for {@post} - the RPC server responded but with no result", post);
             return Option.None<(string Address, uint Index)>();
         }
 
         var fallbackAddress = createFallbackAddressResponse.Result.Addresses.First();
         var fallbackIndex = createFallbackAddressResponse.Result.AddressIndices.First();
         this.logger.LogInformation(
-            "Created fallback address {address} at index {index} for post #{number}",
+            "Created fallback address {address} at index {index} for {@post}",
             fallbackAddress,
             fallbackIndex,
-            post.Number);
+            post);
         return Option.Some((fallbackAddress, fallbackIndex));
     }
 
@@ -319,10 +322,9 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         var latestBounty = await latestBountyTask;
         var latestPostApiResponse = await latestPostApiResponseTask;
 
-        if (latestPostApiResponse.Error is not null)
+        if (latestPostApiResponse.Error is { } latestPostErr)
         {
-            this.logger.LogCritical("Failed to retrieve latest post");
-            latestPostApiResponse.Error.Log(this.logger, LogLevel.Critical);
+            this.logger.LogCritical("Failed to retrieve the latest post: {@fider_error}", latestPostErr);
             return Option.None<List<Post>>();
         }
 
@@ -338,14 +340,14 @@ internal class BountyRegistrationService : IHostedService, IDisposable
 
         if (postsToRegister is 0)
         {
-            this.logger.LogInformation("All {count} posts in Fider have been registered", maxRegisteredPostNumber);
+            this.logger.LogInformation("Posts up to #{max_registed_post_number} have been registered", maxRegisteredPostNumber);
             return Option.None<List<Post>>();
         }
 
         if (postsToRegister is < 0)
         {
             this.logger.LogCritical(
-                "Somehow we have registered more posts then there are in Fider. We have registered up to post number {registered}, yet in Fider there we are only up to post number {posts}",
+                "Somehow we have registered more posts then there are in Fider. We have registered up to post number {max_registed_post_number}, yet in Fider there we are only up to post number {max_fider_post_number}",
                 maxRegisteredPostNumber,
                 maxPostNumber);
             return Option.None<List<Post>>();
@@ -357,69 +359,36 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         }
         else
         {
-            this.logger.LogTrace("Found {count} new posts to register", postsToRegister);
+            this.logger.LogTrace("Found {new_posts_count} new posts to register", postsToRegister);
         }
 
         var fetchPostsApiResponse = await this.fiderApi.GetPostsAsync(count: postsToRegister, token);
 
-        if (fetchPostsApiResponse.Error is not null)
+        if (fetchPostsApiResponse.Error is { } fetchPostsErr)
         {
-            this.logger.LogCritical("Failed to retrieve posts");
-            fetchPostsApiResponse.Error.Log(this.logger, LogLevel.Critical);
+            this.logger.LogCritical(
+                "Failed fetch the lastest {new_posts_count} posts from Fider: {@fider_error}",
+                postsToRegister,
+                fetchPostsErr);
             return Option.None<List<Post>>();
         }
 
         if (fetchPostsApiResponse.Result is null)
         {
-            this.logger.LogCritical("Failed to retrieve posts");
+            this.logger.LogCritical(
+                "Failed fetch the lastest {new_posts_count} posts from Fider - the API returned a result but it was empty",
+                postsToRegister);
             return Option.None<List<Post>>();
         }
 
         var posts = fetchPostsApiResponse.Result;
         if (posts.Count < postsToRegister)
         {
-            this.logger.LogWarning("Expected to retrieve {expected} posts but only recieved {actual}", postsToRegister, posts.Count);
+            this.logger.LogWarning("Expected to retrieve {expected_posts_count} posts but only recieved {actual_posts_count}", postsToRegister, posts.Count);
         }
         else
         {
-            this.logger.LogTrace("All {expected} posts recieved", posts.Count);
-        }
-
-        /* for whatever reason we may have entries for post numbers [1, 2, 4, 5, 8], because the post
-         * numbers are contiguous and we _should_ be importing them in order we should instead have [1, 2, 3, 4, 5, 6, 7, 8]
-         * but if this isn't the case we find the 'missing' post numbers (i.e 3, 6, 7) and grab the individual posts themselves
-         * adding them to the list of posts to import.
-         *
-         * In theory this would allow you to delete a post from the database and have it be successfully restored.
-         */
-        var missingPostNumbers = await BountyQueries.GetMissingPostNumbers(this.context, token);
-        if (missingPostNumbers.Any())
-        {
-            this.logger.LogWarning(
-                "The database contains bounties for post numbers up to #{max}, however it is missing entries for post numbers: {missing}",
-                maxRegisteredPostNumber,
-                missingPostNumbers);
-            this.logger.LogInformation("Attempting to reterive missing posts with numbers: {missing}", missingPostNumbers);
-            foreach (var number in missingPostNumbers)
-            {
-                var getPostResponse = await this.fiderApi.GetPostAsync(number: number, token);
-                if (getPostResponse.Error is not null)
-                {
-                    this.logger.LogCritical("Failed to retrieve post #{number} which is missing from the bounty database, skipping registration", number);
-                    getPostResponse.Error.Log(this.logger, LogLevel.Critical);
-                    continue;
-                }
-                else if (getPostResponse.Result is null)
-                {
-                    this.logger.LogCritical(
-                        "Failed to retrieve post #{number} which is missing from the bounty database, skipping registration - the API returned a response but it was empty",
-                        number);
-                    continue;
-                }
-
-                this.logger.LogInformation("Successfully fetched missing post #{number}", number);
-                posts.Add(getPostResponse.Result);
-            }
+            this.logger.LogTrace("All ({new_posts_count}) new posts recieved for registration", posts.Count);
         }
 
         return Option.Some(posts.OrderBy(p => p.Number).ToList());

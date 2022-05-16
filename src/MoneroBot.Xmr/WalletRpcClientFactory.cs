@@ -3,15 +3,18 @@ namespace MoneroBot.WalletRpc;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 public class WalletRpcClientFactory : IWalletRpcClientFactory
 {
+    private readonly ILoggerFactory loggerFactory;
     private readonly IHttpClientFactory httpFactory;
     private readonly IEnumerable<IValidateOptions<WalletRpcOptions>> validators;
 
-    public WalletRpcClientFactory(IHttpClientFactory httpFactory, IEnumerable<IValidateOptions<WalletRpcOptions>> validators)
+    public WalletRpcClientFactory(ILoggerFactory loggerFactory, IHttpClientFactory httpFactory, IEnumerable<IValidateOptions<WalletRpcOptions>> validators)
     {
+        this.loggerFactory = loggerFactory;
         this.httpFactory = httpFactory;
         this.validators = validators;
     }
@@ -56,6 +59,7 @@ public class WalletRpcClientFactory : IWalletRpcClientFactory
 
         var handler = CreateHttpClientHandler(options);
         var http = ConfigureHttpClient(new HttpClient(handler), options);
-        return new WalletRpcClient(http);
+        var logger = this.loggerFactory.CreateLogger<WalletRpcClient>();
+        return new WalletRpcClient(logger, http);
     }
 }
