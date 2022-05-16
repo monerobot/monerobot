@@ -340,7 +340,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
 
         if (postsToRegister is 0)
         {
-            this.logger.LogInformation("Posts up to #{max_registed_post_number} have been registered", maxRegisteredPostNumber);
+            this.logger.LogInformation("Posts up to #{max_registed_post_number} have been registered (there are no more posts to register at this time)", maxRegisteredPostNumber);
             return Option.None<List<Post>>();
         }
 
