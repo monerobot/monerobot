@@ -10,7 +10,7 @@ namespace MoneroBot.WalletRpc
         private readonly HttpClient http;
         private readonly JsonSerializerOptions jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
-        internal WalletRpcClient(HttpClient http)
+        public WalletRpcClient(HttpClient http)
         {
             this.http = http;
         }

@@ -332,9 +332,9 @@ internal class BountyRegistrationService : IHostedService, IDisposable
             return Option.None<List<Post>>();
         }
 
-        var maxRegisteredPostNumber = latestBounty?.PostNumber;
+        var maxRegisteredPostNumber = latestBounty?.PostNumber ?? 0;
         var maxPostNumber = latestPostApiResponse.Result.Number;
-        var postsToRegister = maxPostNumber - maxRegisteredPostNumber.GetValueOrDefault(0);
+        var postsToRegister = maxPostNumber - maxRegisteredPostNumber;
 
         if (postsToRegister is 0)
         {

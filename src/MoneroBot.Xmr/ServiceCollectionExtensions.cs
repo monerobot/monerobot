@@ -26,12 +26,17 @@ public static class ServiceCollectionExtensions
             .Configure(options => configure?.Invoke(options))
             .ValidateDataAnnotations();
 
-        services.AddTransient(provider =>
-        {
-            var options = provider.GetRequiredService<IOptions<WalletRpcOptions>>().Value;
-            var factory = provider.GetRequiredService<IWalletRpcClientFactory>();
-            return factory.CreateClient(options);
-        });
+        services
+            .AddHttpClient<IWalletRpcClient, WalletRpcClient>("MoneroWalletRpc", (provider, http) =>
+            {
+                var options = provider.GetRequiredService<IOptions<WalletRpcOptions>>().Value;
+                WalletRpcClientFactory.ConfigureHttpClient(http, options);
+            })
+            .ConfigurePrimaryHttpMessageHandler(provider =>
+            {
+                var options = provider.GetRequiredService<IOptions<WalletRpcOptions>>().Value;
+                return WalletRpcClientFactory.CreateHttpClientHandler(options);
+            });
 
         return services;
     }

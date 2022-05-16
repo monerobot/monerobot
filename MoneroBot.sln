@@ -12,10 +12,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{436111A6-ADCE-429F-82E6-D57C92E054EE}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		.env = .env
 		.gitignore = .gitignore
 		.github\workflows\ci.yml = .github\workflows\ci.yml
-		fider.docker-compose.yml = fider.docker-compose.yml
-		fider.env = fider.env
+		docker-compose.yml = docker-compose.yml
 		README.md = README.md
 	EndProjectSection
 EndProject

@@ -8,6 +8,7 @@ using MoneroBot.Daemon.Services;
 using MoneroBot.Database;
 using MoneroBot.Fider.DependencyInjection;
 using MoneroBot.WalletRpc.DependencyInjection;
+using Serilog;
 #pragma warning restore SA1200 // Using directives should be placed correctly
 
 var host = Host.CreateDefaultBuilder(args)
@@ -17,6 +18,13 @@ var host = Host.CreateDefaultBuilder(args)
             .AddJsonFile("appsettings.json")
             .AddEnvironmentVariables()
             .AddCommandLine(args);
+    })
+    .UseSerilog((provider, logging) =>
+    {
+        logging
+            .ReadFrom.Configuration(provider.Configuration)
+            .Enrich.FromLogContext()
+            .WriteTo.Console();
     })
     .ConfigureServices(services =>
     {

@@ -11,6 +11,7 @@ using MoneroBot.Fider.Models;
 using MoneroBot.WalletRpc;
 using MoneroBot.WalletRpc.Models;
 using MoneroBot.WalletRpc.Models.Generated;
+using System.Globalization;
 using System.Numerics;
 using System.Text;
 
@@ -239,10 +240,21 @@ internal class BountyContributionService : IHostedService, IDisposable
         var total = previousTotal + contribution.Transaction!.Amount;
 
         const decimal ATOMIC_TO_MONERO_SCALER = 1e-12m;
-        static string FormatAtomicAmount(ulong amount) => $"{amount * ATOMIC_TO_MONERO_SCALER:G}".TrimEnd('0');
+        static string FormatAtomicAmount(CultureInfo culture, ulong amount)
+        {
+            var seperator = culture.NumberFormat.NumberDecimalSeparator;
+            var moneros = amount * ATOMIC_TO_MONERO_SCALER;
+            if (moneros.ToString(culture).Contains(seperator))
+            {
+                // A piconero     0.000000000001 is the smallet unit
+                return $"{moneros:0.############}";
+            }
+
+            return $"{moneros:N0}";
+        }
 
         var sb = new StringBuilder();
-        sb.Append($"Bounty increased by {FormatAtomicAmount(contribution.Transaction!.Amount)} XMR ");
+        sb.Append($"Bounty increased by {FormatAtomicAmount(CultureInfo.InvariantCulture, contribution.Transaction!.Amount)} XMR ");
         sb.Append(contribution.Transaction switch
         {
             { IsSpent: true } => "📨",
@@ -250,7 +262,7 @@ internal class BountyContributionService : IHostedService, IDisposable
             { IsUnlocked: false } => "⏳"
         });
         sb.AppendLine();
-        sb.Append($"Total Bounty: {FormatAtomicAmount(total)} XMR");
+        sb.Append($"Total Bounty: {FormatAtomicAmount(CultureInfo.InvariantCulture, total)} XMR");
         return sb.ToString();
     }
 

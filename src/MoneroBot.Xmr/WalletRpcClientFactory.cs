@@ -1,6 +1,8 @@
 namespace MoneroBot.WalletRpc;
 
 using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 
 public class WalletRpcClientFactory : IWalletRpcClientFactory
@@ -14,17 +16,8 @@ public class WalletRpcClientFactory : IWalletRpcClientFactory
         this.validators = validators;
     }
 
-    public IWalletRpcClient CreateClient(WalletRpcOptions options)
+    public static HttpClientHandler CreateHttpClientHandler(WalletRpcOptions options)
     {
-        var errors = this.validators
-            .Select(v => v.Validate(string.Empty, options))
-            .Where(r => r.Failed)
-            .ToList();
-        if (errors.Any())
-        {
-            throw new ArgumentException(nameof(options), string.Join('\n', errors.Select(e => e.FailureMessage)));
-        }
-
         var handler = new HttpClientHandler();
         if (options.AcceptSelfSignedCerts is true)
         {
@@ -41,11 +34,28 @@ public class WalletRpcClientFactory : IWalletRpcClientFactory
             handler.Credentials = credentials;
         }
 
-        var http = new HttpClient(handler)
-        {
-            BaseAddress = options.BaseAddress!,
-        };
+        return handler;
+    }
 
+    public static HttpClient ConfigureHttpClient(HttpClient http, WalletRpcOptions options)
+    {
+        http.BaseAddress = options.BaseAddress;
+        return http;
+    }
+
+    public IWalletRpcClient CreateClient(WalletRpcOptions options)
+    {
+        var errors = this.validators
+            .Select(v => v.Validate(string.Empty, options))
+            .Where(r => r.Failed)
+            .ToList();
+        if (errors.Any())
+        {
+            throw new ArgumentException(nameof(options), string.Join('\n', errors.Select(e => e.FailureMessage)));
+        }
+
+        var handler = CreateHttpClientHandler(options);
+        var http = ConfigureHttpClient(new HttpClient(handler), options);
         return new WalletRpcClient(http);
     }
 }
