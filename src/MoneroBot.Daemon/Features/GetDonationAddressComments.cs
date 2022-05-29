@@ -20,11 +20,11 @@ public interface IGetDonationAddressCommentsHandler
 
 public static class DonationAddressTextRegexes
 {
-    public static readonly Regex LegacyText = new Regex(
+    public static readonly Regex LegacyText = new(
         @"^donate\s+to\s+the\s+address\s+below\s+to\s+fund\s+this\s+bounty\s+(?<address>[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{95})\s",
         RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
 
-    public static readonly Regex WithPaymentHref = new Regex(
+    public static readonly Regex WithPaymentHref = new(
         @"^donate\s+to\s+the\s+address\s+below\s+to\s+fund\s+this\s+bounty\s+\[(?<address>[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{95})\]",
         RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
 }
@@ -45,7 +45,7 @@ public class GetDonationAddressCommentsHandler : IGetDonationAddressCommentsHand
     public async Task<List<DonationAddressComment>> HandleAsync(GetDonationAddressComments request, CancellationToken token = default)
     {
         var post = await this.fider.GetPostAsync(request.PostNumber, token);
-        var comments = await this.fider.ListCommentsAsync(post.Number, post.CommentsCount);
+        var comments = await this.fider.ListCommentsAsync(post.Number, post.CommentsCount, token);
 
         var addresses = new List<DonationAddressComment>();
         foreach (var comment in comments)

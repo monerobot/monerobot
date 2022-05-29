@@ -34,15 +34,17 @@ var host = Host.CreateDefaultBuilder(args)
             .ValidateDataAnnotations();
         services.AddFiderApiClient();
         services.AddMoneroWalletRpcClient();
-        services.AddDbContext<MoneroBotContext>((provider, options) =>
-        {
-            var config = provider.GetRequiredService<IConfiguration>();
-            var env = provider.GetService<IHostEnvironment>();
-            options
-                .UseSqlite(config.GetConnectionString("MoneroBotContext"))
-                .UseSnakeCaseNamingConvention()
-                .EnableSensitiveDataLogging(sensitiveDataLoggingEnabled: env?.IsDevelopment() is true);
-        }, contextLifetime: ServiceLifetime.Transient);
+        services.AddDbContext<MoneroBotContext>(
+            (provider, options) =>
+            {
+                var config = provider.GetRequiredService<IConfiguration>();
+                var env = provider.GetService<IHostEnvironment>();
+                options
+                    .UseSqlite(config.GetConnectionString("MoneroBotContext"))
+                    .UseSnakeCaseNamingConvention()
+                    .EnableSensitiveDataLogging(sensitiveDataLoggingEnabled: env?.IsDevelopment() is true);
+            },
+            contextLifetime: ServiceLifetime.Transient);
 
         services.AddScoped<IGetDonationAddressCommentsHandler, GetDonationAddressCommentsHandler>();
         services.AddScoped<IGetDonationCommentsHandler, GetDonationCommentsHandler>();
