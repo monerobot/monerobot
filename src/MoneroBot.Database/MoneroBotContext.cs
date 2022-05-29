@@ -12,9 +12,15 @@ public class MoneroBotContext : DbContext
 
     public DbSet<Bounty> Bounties { get; set; } = null!;
 
-    public DbSet<BountyContribution> BountyContributions { get; set; } = null!;
+    public DbSet<Comment> Comments { get; set; } = null!;
 
-    public DbSet<XmrTransaction> XmrTransactions { get; set; } = null!;
+    public DbSet<DonationAddress> DonationAddresses { get; set; } = null!;
+
+    public DbSet<Donation> Donations { get; set; } = null!;
+
+    public DbSet<DonationEnote> DonationEnotes { get; set; } = null!;
+
+    public DbSet<Enote> Enotes { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -5,8 +5,6 @@ VisualStudioVersion = 17.3.32505.426
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{CCF389B9-E6FC-4F39-AF58-C9C25769F97F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoneroBot.WalletRpc", "src\MoneroBot.Xmr\MoneroBot.WalletRpc.csproj", "{B81A3BB3-7D5A-47BC-9EA0-E7687630A590}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoneroBot.Fider", "src\MoneroBot.Fider\MoneroBot.Fider.csproj", "{13A2D009-B3E6-4373-B71B-F1F4E5E7F473}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{436111A6-ADCE-429F-82E6-D57C92E054EE}"
@@ -25,16 +23,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoneroBot.Database", "src\M
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoneroBot.WalletRpcGenerator", "src\MoneroBot.WalletRpcGenerator\MoneroBot.WalletRpcGenerator.csproj", "{0D5C09B2-1749-4FEC-ACEA-133D0C17C0B7}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoneroBot.WalletRpc", "src\MoneroBot.WalletRpc\MoneroBot.WalletRpc.csproj", "{249096B2-3874-4E6A-9EFB-8E6370EC769B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MoneroBot.Tests", "src\MoneroBot.Tests\MoneroBot.Tests.csproj", "{4726EF47-9342-47A8-9E8B-56BDD0DEFC4E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B81A3BB3-7D5A-47BC-9EA0-E7687630A590}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B81A3BB3-7D5A-47BC-9EA0-E7687630A590}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B81A3BB3-7D5A-47BC-9EA0-E7687630A590}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B81A3BB3-7D5A-47BC-9EA0-E7687630A590}.Release|Any CPU.Build.0 = Release|Any CPU
 		{13A2D009-B3E6-4373-B71B-F1F4E5E7F473}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{13A2D009-B3E6-4373-B71B-F1F4E5E7F473}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{13A2D009-B3E6-4373-B71B-F1F4E5E7F473}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -51,16 +49,25 @@ Global
 		{0D5C09B2-1749-4FEC-ACEA-133D0C17C0B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0D5C09B2-1749-4FEC-ACEA-133D0C17C0B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0D5C09B2-1749-4FEC-ACEA-133D0C17C0B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{249096B2-3874-4E6A-9EFB-8E6370EC769B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{249096B2-3874-4E6A-9EFB-8E6370EC769B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{249096B2-3874-4E6A-9EFB-8E6370EC769B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{249096B2-3874-4E6A-9EFB-8E6370EC769B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4726EF47-9342-47A8-9E8B-56BDD0DEFC4E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4726EF47-9342-47A8-9E8B-56BDD0DEFC4E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4726EF47-9342-47A8-9E8B-56BDD0DEFC4E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4726EF47-9342-47A8-9E8B-56BDD0DEFC4E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{B81A3BB3-7D5A-47BC-9EA0-E7687630A590} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
 		{13A2D009-B3E6-4373-B71B-F1F4E5E7F473} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
 		{706E3709-9E24-4260-BABF-6EC1B21758B1} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
 		{F2BAC870-2ED6-48C7-BD37-D76441937C80} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
 		{0D5C09B2-1749-4FEC-ACEA-133D0C17C0B7} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
+		{249096B2-3874-4E6A-9EFB-8E6370EC769B} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
+		{4726EF47-9342-47A8-9E8B-56BDD0DEFC4E} = {CCF389B9-E6FC-4F39-AF58-C9C25769F97F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7DE0FB8B-02CE-4257-9891-5B75D6E81047}

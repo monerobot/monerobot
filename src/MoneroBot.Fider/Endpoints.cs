@@ -32,6 +32,17 @@ internal static class Endpoints
         return QueryHelpers.AddQueryString("/api/v1/posts", @params);
     }
 
+    public static string ListComments(int number, int? count)
+    {
+        var @params = new Dictionary<string, string>();
+        if (count is not null)
+        {
+            @params.Add("number", count.Value.ToString());
+        }
+
+        return QueryHelpers.AddQueryString($"/api/v1/posts/{number}/comments", @params);
+    }
+
     public static string AddComment(int number) => $"/api/v1/posts/{number}/comments";
 
     public static string EditComment(int number, int id) => $"/api/v1/posts/{number}/comments/{id}";

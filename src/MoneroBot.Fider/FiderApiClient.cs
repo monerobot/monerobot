@@ -17,94 +17,66 @@ public class FiderApiClient : IFiderApiClient
         this.http = http;
     }
 
-    public async Task<FiderResponse<List<Post>>> GetPostsAsync(int count, CancellationToken token = default)
+    public async Task<List<Post>> GetPostsAsync(int count, CancellationToken token = default)
     {
         var response = await this.http.GetAsync(Endpoints.ListPosts(view: "recent", limit: count), token);
         return await this.ProcessResponseAsync<List<Post>>(response, token);
     }
 
-    public async Task<FiderResponse<Post>> GetPostAsync(int number, CancellationToken token = default)
+    public async Task<Post> GetPostAsync(int number, CancellationToken token = default)
     {
         var response = await this.http.GetAsync(Endpoints.GetPost(number: number), token);
         return await this.ProcessResponseAsync<Post>(response, token);
     }
 
-    public async Task<FiderResponse<Post?>> GetLatestPostAsync(CancellationToken token = default)
+    public async Task<Post?> GetLatestPostAsync(CancellationToken token = default)
     {
         var posts = await this.GetPostsAsync(count: 1, token);
-        return posts switch
-        {
-            { Result: { } ps } => FiderResponse<Post?>.Ok(ps.FirstOrDefault()),
-            { Error: { } err } => FiderResponse<Post?>.Err(err),
-            _ => throw new NotImplementedException()
-        };
+        return posts.FirstOrDefault();
     }
 
-    public async Task<FiderResponse<int>> PostCommentAsync(int postNumber, string content, List<ImageUpload> attachments, CancellationToken token = default)
+    public async Task<List<Comment>> ListCommentsAsync(int postNumber, int number, CancellationToken token = default)
+    {
+        var response = await this.http.GetAsync(Endpoints.ListComments(postNumber, number));
+        return await this.ProcessResponseAsync<List<Comment>>(response, token);
+    }
+
+    public async Task<int> PostCommentAsync(int postNumber, string content, List<ImageUpload> attachments, CancellationToken token = default)
     {
         var data = new StringContent(
             JsonSerializer.Serialize(new { content, attachments }, this.jsonOptions),
             Encoding.UTF8,
             MediaTypeNames.Application.Json);
         var response = await this.http.PostAsync(Endpoints.AddComment(number: postNumber), data);
-        var result = await this.ProcessResponseAsync<JsonNode>(response, token);
-        return result switch
+        var node = await this.ProcessResponseAsync<JsonNode>(response, token);
+        if (node["id"] is { } prop && prop.GetValue<int?>() is { } id)
         {
-            { Result: { } node } => node["id"] is { } prop && prop.GetValue<int?>() is { } id
-                ? FiderResponse<int>.Ok(id)
-                : FiderResponse<int>.Err(new MalformedResponse()),
-            { Error: { } err } => FiderResponse<int>.Err(err),
-            _ => throw new NotImplementedException()
-        };
+            return id;
+        }
+
+        throw new HttpRequestException("Malformed response");
     }
 
-    public async Task<FiderResponse<Unit>> UpdateCommentAsync(int postNumber, int commentId, string content, CancellationToken token = default)
+    public async Task UpdateCommentAsync(int postNumber, int commentId, string content, CancellationToken token = default)
     {
         var data = new StringContent(
             JsonSerializer.Serialize(new { content }, this.jsonOptions),
             Encoding.UTF8,
             MediaTypeNames.Application.Json);
         var response = await this.http.PutAsync(Endpoints.EditComment(number: postNumber, id: commentId), data);
-        var result = await this.ProcessResponseAsync<JsonNode>(response, token);
-        return result switch
-        {
-            { Result: { } node } => FiderResponse<Unit>.Ok(new Unit()),
-            { Error: { } err } => FiderResponse<Unit>.Err(err),
-            _ => throw new NotImplementedException()
-        };
+        await this.ProcessResponseAsync<JsonNode>(response, token);
     }
 
-    private async Task<FiderResponse<T>> ProcessResponseAsync<T>(HttpResponseMessage response, CancellationToken token = default)
+    private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, CancellationToken token = default)
     {
-        if (response.StatusCode is HttpStatusCode.OK)
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStreamAsync(token);
+        var result = await JsonSerializer.DeserializeAsync<T>(content, this.jsonOptions, cancellationToken: token);
+        if (result is null)
         {
-            var content = await response.Content.ReadAsStreamAsync(token);
-            var result = await JsonSerializer.DeserializeAsync<T>(content, this.jsonOptions, cancellationToken: token);
-            return result switch
-            {
-                null => FiderResponse<T>.Err(new MalformedResponse()),
-                { } value => FiderResponse<T>.Ok(value)
-            };
+            throw new JsonException();
         }
-        else if (response.StatusCode is HttpStatusCode.BadRequest)
-        {
-            var content = await response.Content.ReadAsStreamAsync(token);
-            var errorSet = await JsonSerializer.DeserializeAsync<ErrorSet>(content, this.jsonOptions, cancellationToken: token);
-            return FiderResponse<T>.Err(new BadRequest(errorSet?.Errors ?? Array.Empty<Error>()));
-        }
-        else if (response.StatusCode is HttpStatusCode.Forbidden)
-        {
-            return FiderResponse<T>.Err(new Forbidden());
-        }
-        else if (response.StatusCode is HttpStatusCode.NotFound)
-        {
-            return FiderResponse<T>.Err(new NotFound());
-        }
-        else if (response.StatusCode is HttpStatusCode.InternalServerError)
-        {
-            return FiderResponse<T>.Err(new InternalError());
-        }
-        
-        return FiderResponse<T>.Err(new UnkownError(response.StatusCode, await response.Content.ReadAsStringAsync(token)));
+
+        return result;
     }
 }

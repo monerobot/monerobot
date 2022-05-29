@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MoneroBot.Daemon;
+using MoneroBot.Daemon.Features;
 using MoneroBot.Daemon.Services;
 using MoneroBot.Database;
 using MoneroBot.Fider.DependencyInjection;
@@ -33,17 +34,34 @@ var host = Host.CreateDefaultBuilder(args)
             .ValidateDataAnnotations();
         services.AddFiderApiClient();
         services.AddMoneroWalletRpcClient();
-        services.AddDbContextFactory<MoneroBotContext>((provider, options) =>
+        services.AddDbContext<MoneroBotContext>((provider, options) =>
         {
             var config = provider.GetRequiredService<IConfiguration>();
             var env = provider.GetService<IHostEnvironment>();
             options
                 .UseSqlite(config.GetConnectionString("MoneroBotContext"))
+                .UseSnakeCaseNamingConvention()
                 .EnableSensitiveDataLogging(sensitiveDataLoggingEnabled: env?.IsDevelopment() is true);
-        });
+        }, contextLifetime: ServiceLifetime.Transient);
+
+        services.AddScoped<IGetDonationAddressCommentsHandler, GetDonationAddressCommentsHandler>();
+        services.AddScoped<IGetDonationCommentsHandler, GetDonationCommentsHandler>();
+        services.AddScoped<IGetAddressIndexHander, GetAddressIndexHandler>();
+        services.AddScoped<IGetIncomingTransfersHandler, GetIncomingTransfersHandler>();
+        services.AddScoped<IGetUnregisteredPostsHandler, GetUnregisteredPostsHandler>();
+        services.AddScoped<IRegisterExistingBountyHandler, RegisterExistingBountyHandler>();
+        services.AddScoped<IRegisterNewBountyHandler, RegisterNewBountyHandler>();
+        services.AddScoped<IReconcileDonationsWithTransfers, ReconcileDonationsWithTransfersHandler>();
 
         services.AddHostedService<BountyRegistrationService>();
-        services.AddHostedService<BountyContributionService>();
+        services.AddHostedService<BountyDonationService>();
     })
     .Build();
+
+using (var scope = host.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<MoneroBotContext>();
+    await db.Database.EnsureCreatedAsync();
+}
+
 await host.RunAsync();

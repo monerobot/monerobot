@@ -17,7 +17,7 @@ services:
     restart: always
     image: getfider/fider:PR_1069
     ports:
-      - "${FIDER_PORT:-80}:3000"
+      - "${FIDER_PORT:-38080}:3000"
     environment:
       - BASE_URL
       - DATABASE_URL
@@ -41,7 +41,7 @@ services:
     restart: always
     image: rnwood/smtp4dev
     ports:
-        - "${SMTP4DEV_PORT:-8081}:80"
+        - "${SMTP4DEV_PORT:-38081}:80"
   adminer:
     image: adminer
     restart: always
