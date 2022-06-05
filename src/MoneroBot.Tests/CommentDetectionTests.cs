@@ -1,6 +1,7 @@
 namespace MoneroBot.Tests;
 
-using MoneroBot.Daemon.Features;
+
+using Daemon.Features;
 
 public class DonationAddressTests
 {

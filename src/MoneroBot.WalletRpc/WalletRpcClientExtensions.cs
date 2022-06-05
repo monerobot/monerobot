@@ -1,8 +1,8 @@
-namespace MoneroBot.WalletRpc.Extensions;
+namespace MoneroBot.WalletRpc;
 
 using System.Diagnostics;
-using MoneroBot.WalletRpc.Models;
-using MoneroBot.WalletRpc.Models.Generated;
+using Models;
+using Models.Generated;
 
 public static class WalletRpcClientExtensions
 {
@@ -14,7 +14,7 @@ public static class WalletRpcClientExtensions
         {
             try
             {
-                await client.JsonRpcAsync(new MoneroRpcRequest("get_address", new GetAddressParameters(0, new ())));
+                await client.JsonRpcAsync(new MoneroRpcRequest("get_address", new GetAddressParameters(0, new())));
                 return true;
             }
             catch

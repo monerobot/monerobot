@@ -1,11 +1,10 @@
 namespace MoneroBot.Fider;
 
-using System.Net;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using MoneroBot.Fider.Models;
+using Models;
 
 public class FiderApiClient : IFiderApiClient
 {
@@ -65,6 +64,12 @@ public class FiderApiClient : IFiderApiClient
             MediaTypeNames.Application.Json);
         var response = await this.http.PutAsync(Endpoints.EditComment(number: postNumber, id: commentId), data);
         await this.ProcessResponseAsync<JsonNode>(response, token);
+    }
+
+    public async Task DeleteCommentAsync(int postNumber, int commentId, CancellationToken token = default)
+    {
+        var response = await this.http.DeleteAsync(Endpoints.DeleteComment(postNumber, commentId), token);
+        response.EnsureSuccessStatusCode();
     }
 
     private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, CancellationToken token = default)

@@ -9,4 +9,7 @@ public class DaemonOptions
 
     [Required]
     public TimeSpan PollingInterval { get; set; }
+
+    [Required]
+    public int FiderMoneroBotUserId { get; set; }
 }

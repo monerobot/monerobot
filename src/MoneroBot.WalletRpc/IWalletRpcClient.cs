@@ -1,19 +1,16 @@
-namespace MoneroBot.WalletRpc
+namespace MoneroBot.WalletRpc;
+
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using Models;
+
+public interface IWalletRpcClient
 {
-    using System.Net.Http;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using MoneroBot.WalletRpc.Models;
+    public Uri? JsonRpcUri { get; }
 
-#pragma warning disable SA1600 // Elements should be documented
-    public interface IWalletRpcClient
-#pragma warning restore SA1600 // Elements should be documented
-    {
-        public Uri? JsonRpcUri { get; }
+    public Task<HttpResponseMessage> JsonRpcAsync(MoneroRpcRequest request, CancellationToken token = default);
 
-        public Task<HttpResponseMessage> JsonRpcAsync(MoneroRpcRequest request, CancellationToken token = default);
-
-        public Task<IMoneroRpcResponse<TResult>> JsonRpcAsync<TResult>(MoneroRpcRequest request, CancellationToken token = default)
-            where TResult : class;
-    }
+    public Task<IMoneroRpcResponse<TResult>> JsonRpcAsync<TResult>(MoneroRpcRequest request, CancellationToken token = default)
+        where TResult : class;
 }

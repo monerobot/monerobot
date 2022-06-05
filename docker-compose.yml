@@ -7,12 +7,6 @@ services:
         - "${SEQ_LOG_PORT:-38084}:5341"
     environment:
         - ACCEPT_EULA=Y
-  db:
-    restart: always
-    image: postgres:12
-    environment:
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
   fider:
     restart: always
     image: getfider/fider:PR_1069

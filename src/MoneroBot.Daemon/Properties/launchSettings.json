@@ -1,10 +1,11 @@
-{
+﻿{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
     "MoneroBot.Daemon": {
-      "commandName": "Project"
-    },
-    "Docker": {
-      "commandName": "Docker"
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
     }
   }
 }

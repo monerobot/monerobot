@@ -1,20 +1,20 @@
 namespace MoneroBot.Daemon.Features;
 
 using Microsoft.Extensions.Logging;
-using MoneroBot.WalletRpc;
-using MoneroBot.WalletRpc.Models;
-using MoneroBot.WalletRpc.Models.Generated;
+using WalletRpc;
+using WalletRpc.Models;
+using WalletRpc.Models.Generated;
 
 public record GetAddressIndex(string Address);
 
 public record AddressIndex(uint Major, uint Minor);
 
-public interface IGetAddressIndexHander
+public interface IGetAddressIndexHandler
 {
     public Task<AddressIndex?> HandleAsync(GetAddressIndex request, CancellationToken token = default);
 }
 
-public class GetAddressIndexHandler : IGetAddressIndexHander
+public class GetAddressIndexHandler : IGetAddressIndexHandler
 {
     private readonly ILogger<GetAddressIndexHandler> logger;
     private readonly IWalletRpcClient wallet;
@@ -34,29 +34,29 @@ public class GetAddressIndexHandler : IGetAddressIndexHander
                 token);
             if (response.Result is { Index: { Major: { } major, Minor: { } minor } })
             {
-                return new(major, minor);
+                return new AddressIndex(major, minor);
             }
 
             if (response.Error is { } error)
             {
                 this.logger.LogError(
-                    "Failed to retrieve the address index of {address}: {@error}",
+                    "Failed to retrieve the address index of {Address}: {@WalletRpcError}",
                     request.Address,
                     error);
             }
             else
             {
                 this.logger.LogError(
-                    "Failed to retrieve rhe address index of {address} - the RPC returned a response but it was empty",
+                    "Failed to retrieve rhe address index of {Address} - the RPC returned a response but it was empty",
                     request.Address);
             }
         }
         catch (Exception exception)
         {
             this.logger.LogError(
-                "An unhandled exception occured whilst trying to retrieve the address index of {address}: {@exception}",
-                request.Address,
-                exception);
+                exception,
+                "An unhandled exception occured whilst trying to retrieve the address index of {Address}",
+                request.Address);
         }
 
         return null;

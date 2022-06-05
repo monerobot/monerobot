@@ -8,15 +8,16 @@ using MoneroBot.Daemon.Features;
 using MoneroBot.Daemon.Services;
 using MoneroBot.Database;
 using MoneroBot.Fider.DependencyInjection;
-using MoneroBot.WalletRpc.DependencyInjection;
+using MoneroBot.WalletRpc;
 using Serilog;
 #pragma warning restore SA1200 // Using directives should be placed correctly
 
 var host = Host.CreateDefaultBuilder(args)
-    .ConfigureAppConfiguration(builder =>
+    .ConfigureAppConfiguration((ctx, builder) =>
     {
         builder
             .AddJsonFile("appsettings.json")
+            .AddJsonFile($"appsettings.{ctx.HostingEnvironment.EnvironmentName}.json", optional: true)
             .AddEnvironmentVariables()
             .AddCommandLine(args);
     })
@@ -34,7 +35,7 @@ var host = Host.CreateDefaultBuilder(args)
             .ValidateDataAnnotations();
         services.AddFiderApiClient();
         services.AddMoneroWalletRpcClient();
-        services.AddDbContext<MoneroBotContext>(
+        services.AddDbContextFactory<MoneroBotContext>(
             (provider, options) =>
             {
                 var config = provider.GetRequiredService<IConfiguration>();
@@ -42,18 +43,17 @@ var host = Host.CreateDefaultBuilder(args)
                 options
                     .UseSqlite(config.GetConnectionString("MoneroBotContext"))
                     .UseSnakeCaseNamingConvention()
-                    .EnableSensitiveDataLogging(sensitiveDataLoggingEnabled: env?.IsDevelopment() is true);
-            },
-            contextLifetime: ServiceLifetime.Transient);
+                    .EnableSensitiveDataLogging(sensitiveDataLoggingEnabled: env.IsDevelopment());
+            });
 
-        services.AddScoped<IGetDonationAddressCommentsHandler, GetDonationAddressCommentsHandler>();
-        services.AddScoped<IGetDonationCommentsHandler, GetDonationCommentsHandler>();
-        services.AddScoped<IGetAddressIndexHander, GetAddressIndexHandler>();
-        services.AddScoped<IGetIncomingTransfersHandler, GetIncomingTransfersHandler>();
-        services.AddScoped<IGetUnregisteredPostsHandler, GetUnregisteredPostsHandler>();
-        services.AddScoped<IRegisterExistingBountyHandler, RegisterExistingBountyHandler>();
-        services.AddScoped<IRegisterNewBountyHandler, RegisterNewBountyHandler>();
-        services.AddScoped<IReconcileDonationsWithTransfers, ReconcileDonationsWithTransfersHandler>();
+        services.AddTransient<IGetAddressIndexHandler, GetAddressIndexHandler>();
+        services.AddTransient<IGetDonationAddressCommentsHandler, GetDonationAddressCommentsHandler>();
+        services.AddTransient<IGetDonationCommentsHandler, GetDonationCommentsHandler>();
+        services.AddTransient<IGetIncomingTransfersHandler, GetIncomingTransfersHandler>();
+        services.AddTransient<IGetUnregisteredPostsHandler, GetUnregisteredPostsHandler>();
+        services.AddTransient<IRegisterExistingBountyHandler, RegisterExistingBountyHandler>();
+        services.AddTransient<IRegisterNewBountyHandler, RegisterNewBountyHandler>();
+        services.AddTransient<ISynchronizePostDonationCommentsHandler, SynchronizePostDonationCommentsHandler>();
 
         services.AddHostedService<BountyRegistrationService>();
         services.AddHostedService<BountyDonationService>();
@@ -62,7 +62,8 @@ var host = Host.CreateDefaultBuilder(args)
 
 using (var scope = host.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<MoneroBotContext>();
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<MoneroBotContext>>();
+    await using var db = await factory.CreateDbContextAsync();
     await db.Database.EnsureCreatedAsync();
 }
 

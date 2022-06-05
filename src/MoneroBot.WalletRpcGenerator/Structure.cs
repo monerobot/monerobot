@@ -1,4 +1,4 @@
-namespace MoneroPay.WalletRpcGenerator
+namespace MoneroBot.WalletRpcGenerator
 {
     internal record Structure
     {
@@ -8,6 +8,7 @@ namespace MoneroPay.WalletRpcGenerator
         }
 
         public string Name {get;set;}
+
         public List<FieldDefinition> Fields {get;set;} = new List<FieldDefinition>();
     }
 }

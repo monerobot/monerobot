@@ -1,4 +1,4 @@
-namespace MoneroPay.WalletRpcGenerator
+namespace MoneroBot.WalletRpcGenerator
 {
     internal record Typedef
     {
@@ -9,6 +9,7 @@ namespace MoneroPay.WalletRpcGenerator
         }
 
         public string Type {get;set;}
+
         public string Alias {get;set;}
     }
 }

@@ -4,7 +4,7 @@ namespace MoneroBot.WalletRpc
     using System.Text;
     using System.Text.Json;
     using Microsoft.Extensions.Logging;
-    using MoneroBot.WalletRpc.Models;
+    using Models;
 
     public class WalletRpcClient : IWalletRpcClient
     {
@@ -42,7 +42,7 @@ namespace MoneroBot.WalletRpc
             catch (HttpRequestException error) when (error.StatusCode is null)
             {
                 this.logger.LogWarning(
-                    "A connection to the Monero Wallet RPC server at {rpc_base_address} count not be established: {message}",
+                    "A connection to the Monero Wallet RPC server at {RpcBaseAddress} count not be established: {Message}",
                     this.http.BaseAddress,
                     error.Message);
                 return new MoneroRpcResponse<TResult>(request.Id, request.JsonRpc, null)
@@ -53,7 +53,7 @@ namespace MoneroBot.WalletRpc
             catch (HttpRequestException error)
             {
                 this.logger.LogWarning(
-                    "A request to the Monero Wallet RPC server at {rpc_base_address} for command {command_name} failed: ({code}) {message}",
+                    "A request to the Monero Wallet RPC server at {RpcBaseAddress} for command {CommandName} failed: ({StatusCode}) {Message}",
                     this.http.BaseAddress,
                     request.Method,
                     error.StatusCode,

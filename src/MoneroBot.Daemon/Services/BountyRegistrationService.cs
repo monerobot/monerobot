@@ -1,9 +1,9 @@
 namespace MoneroBot.Daemon.Services;
 
+using Features;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MoneroBot.Daemon.Features;
 
 internal class BountyRegistrationService : IHostedService, IDisposable
 {
@@ -34,7 +34,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         this.logger.LogInformation("The Bounty registration service which creates bounties for posts has started");
 
         this.cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-        this.timer = new(this.Tick, null, 0, Timeout.Infinite);
+        this.timer = new Timer(this.Tick, null, 0, Timeout.Infinite);
 
         return Task.CompletedTask;
     }
@@ -55,7 +55,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         }
         catch (Exception exception)
         {
-            this.logger.LogCritical("An unhandled exception occured whilst performing registrations: {exception}", exception);
+            this.logger.LogCritical(exception, "An unhandled exception occured whilst performing registrations");
         }
         finally
         {
@@ -68,40 +68,60 @@ internal class BountyRegistrationService : IHostedService, IDisposable
     {
         this.logger.LogTrace("Scanning for posts to register bounties for");
 
-        var posts = await this.getUnregisteredPosts.HandleAsync(new GetUnregisterdPosts(), token);
+        var posts = await this.getUnregisteredPosts.HandleAsync(new GetUnregisteredPosts(), token);
         if (posts.Count is 0)
         {
             this.logger.LogTrace("There are no more posts to register at this time");
             return;
         }
 
-        foreach (var (postNumber, isExistingBounty) in posts)
+        var existing = posts.Where(p => p.IsExistingBounty).ToList();
+        var @new = posts.Except(existing).ToList();
+
+        /* we need to import any existing posts first because we want to avoid giving out an address which
+         * is in use by a different existing post! And the only way we can check that is by first importing any
+         * existing posts so that the information is in our database.
+         */
+        foreach (var post in existing)
         {
-            int? id;
-
-            if (isExistingBounty)
-            {
-                this.logger.LogInformation("Registering post #{post_number} as a  bounty", postNumber);
-                id = await this.registerExistingBounty.HandleAsync(new RegisterExistingBounty(postNumber), token);
-            }
-            else
-            {
-                this.logger.LogInformation("Importing post #{post_number} as a new bounty", postNumber);
-                id = await this.registerNewBounty.HandleAsync(new RegisterNewBounty(postNumber, this.options.WalletAccountIndex));
-            }
-
+            this.logger.LogInformation("Registering post #{PostNumber} as a  bounty", post.PostNumber);
+            var id = await this.registerExistingBounty.HandleAsync(new RegisterExistingBounty(post.PostNumber), token);
             if (id is not null)
             {
                 this.logger.LogInformation(
-                    "Successfully registered a bounty (id = {bounty_id}) for post #{post_number}",
+                    "Successfully registered a bounty (id = {BountyId}) for existing post #{PostNumber}",
                     id,
-                    postNumber);
+                    post.PostNumber);
             }
             else
             {
-                this.logger.LogWarning(
-                    "Failed to register a bounty for post #{post_number} for an unkown reason",
-                    postNumber);
+                this.logger.LogError(
+                    "Failed to register a bounty for post #{PostNumber} for an unknown reason - because " +
+                    "this is an existing post the import process will halt and try again later. All existing posts " +
+                    "must be imported before new ones can be processed so as to ensure that donation addresses are never " +
+                    "reused. And we can only detect re-use if we know what donation addresses are already in use. ",
+                    post.PostNumber);
+                return;
+            }
+        }
+
+        foreach (var post in @new)
+        {
+            this.logger.LogInformation("Importing post #{PostNumber} as a new bounty", post.PostNumber);
+            var id = await this.registerNewBounty.HandleAsync(new RegisterNewBounty(post.PostNumber, this.options.WalletAccountIndex), token);
+            if (id is not null)
+            {
+                this.logger.LogInformation(
+                    "Successfully registered a bounty (id = {BountyId}) for new post #{PostNumber}",
+                    id,
+                    post.PostNumber);
+            }
+            else
+            {
+                this.logger.LogError(
+                    "Failed to register a bounty for post #{PostNumber} for an unknown reason",
+                    post.PostNumber);
+                return;
             }
         }
     }

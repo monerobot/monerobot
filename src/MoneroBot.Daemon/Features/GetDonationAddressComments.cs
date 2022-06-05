@@ -1,17 +1,13 @@
 namespace MoneroBot.Daemon.Features;
 
-using Microsoft.Extensions.Logging;
-using MoneroBot.Fider;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using Fider;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 public record GetDonationAddressComments(int PostNumber);
 
-public record DonationAddressComment(int CommentId, string Address, string Content);
+public record DonationAddressComment(int CommentId, string Address);
 
 public interface IGetDonationAddressCommentsHandler
 {
@@ -31,15 +27,15 @@ public static class DonationAddressTextRegexes
 
 public class GetDonationAddressCommentsHandler : IGetDonationAddressCommentsHandler
 {
-    private const string FIDER_MONERO_BOT_USERNAME = "Monero Bounties Bot";
-    private const string FIDER_ADMIN_ROLE = "administrator";
     private readonly IFiderApiClient fider;
     private readonly ILogger<GetDonationAddressCommentsHandler> logger;
+    private readonly DaemonOptions options;
 
-    public GetDonationAddressCommentsHandler(ILogger<GetDonationAddressCommentsHandler> logger, IFiderApiClient fider)
+    public GetDonationAddressCommentsHandler(ILogger<GetDonationAddressCommentsHandler> logger, IOptions<DaemonOptions> options,  IFiderApiClient fider)
     {
         this.logger = logger;
         this.fider = fider;
+        this.options = options.Value;
     }
 
     public async Task<List<DonationAddressComment>> HandleAsync(GetDonationAddressComments request, CancellationToken token = default)
@@ -50,12 +46,7 @@ public class GetDonationAddressCommentsHandler : IGetDonationAddressCommentsHand
         var addresses = new List<DonationAddressComment>();
         foreach (var comment in comments)
         {
-            if (comment.User.Role is not FIDER_ADMIN_ROLE)
-            {
-                continue;
-            }
-
-            if (comment.User.Name is not FIDER_MONERO_BOT_USERNAME)
+            if (comment.User.Id != this.options.FiderMoneroBotUserId)
             {
                 continue;
             }
@@ -72,20 +63,19 @@ public class GetDonationAddressCommentsHandler : IGetDonationAddressCommentsHand
             };
             var match = regexes
                 .Select(r => r.Match(comment.Content))
-                .Where(m => m is { } match
-                    && match.Success
+                .FirstOrDefault(m =>
+                    m is {Success: true} match
                     && match.Groups.ContainsKey("address")
-                    && match.Groups["address"].Success)
-                .FirstOrDefault();
-            if (match is not null && match.Groups["address"].Value is { } addr)
+                    && match.Groups["address"].Success);
+            if (match?.Groups["address"].Value is { } addr)
             {
-                var address = new DonationAddressComment(CommentId: comment.Id, Address: addr, Content: comment.Content);
+                var address = new DonationAddressComment(CommentId: comment.Id, Address: addr);
                 addresses.Add(address);
             }
             else
             {
                 this.logger.LogError(
-                    "Failed to parse and extract the donation address from the comment {@comment} which is expected to be a donation address comment for post {@post} given that it contained the phrase 'donate' and was made by the monero bot.",
+                    "Failed to parse and extract the donation address from the comment {@Comment} which is expected to be a donation address comment for post {@Post} given that it contained the phrase 'donate' and was made by the monero bot",
                     comment,
                     post);
             }

@@ -20,8 +20,11 @@ public class Bounty
     public int Id { get; set; }
 
     public uint PostNumber { get; set; }
-
+    
+    [Required]
     public string Slug { get; set; }
-
+    
     public virtual ICollection<DonationAddress>? DonationAddresses { get; set; }
+
+    public virtual ICollection<Donation>? Donations { get; set; }
 }

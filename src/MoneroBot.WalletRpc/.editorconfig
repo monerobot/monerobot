@@ -1,0 +1,97 @@
+[*.cs]
+# Elements should be separated by blank line
+dotnet_diagnostic.SA1516.severity = None
+# Code should not contain multiple blank lines in a row
+dotnet_diagnostic.SA1507.severity = None
+# Field should be private
+dotnet_diagnostic.SA1401.severity = None
+# Field should be private
+dotnet_diagnostic.SA1401.severity = None
+# Field should be private
+dotnet_diagnostic.SA1401.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Elements should be separated by blank line
+dotnet_diagnostic.SA1516.severity = None
+# Elements should be separated by blank line
+dotnet_diagnostic.SA1516.severity = None
+# Single-line comments should not be followed by blank line
+dotnet_diagnostic.SA1512.severity = None
+# Single-line comment should be preceded by blank line
+dotnet_diagnostic.SA1515.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Element 'resolver' should begin with an uppercase letter
+dotnet_diagnostic.SA1300.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Closing parenthesis should be on line of last parameter
+dotnet_diagnostic.SA1111.severity = None
+# Closing parenthesis should be on line of last parameter
+dotnet_diagnostic.SA1111.severity = None
+# Closing parenthesis should be on line of last parameter
+dotnet_diagnostic.SA1111.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Variable 'CRYPTONOTE_MAX_BLOCK_NUMBER' should begin with lower-case letter
+dotnet_diagnostic.SA1312.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Code should not contain multiple blank lines in a row
+dotnet_diagnostic.SA1507.severity = None
+# Elements should be separated by blank line
+dotnet_diagnostic.SA1516.severity = None
+# Braces for multi-line statements should not share line
+dotnet_diagnostic.SA1500.severity = None
+# Braces should not be omitted
+dotnet_diagnostic.SA1503.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = None
+# Elements should be separated by blank line
+dotnet_diagnostic.SA1516.severity = None
+# Closing parenthesis should be on line of last parameter
+dotnet_diagnostic.SA1111.severity = None
+# Closing parenthesis should be on line of last parameter
+dotnet_diagnostic.SA1111.severity = None
+# Closing parenthesis should be on line of last parameter
+dotnet_diagnostic.SA1111.severity = None
+# IDE0065: Misplaced using directive
+csharp_using_directive_placement = inside_namespace

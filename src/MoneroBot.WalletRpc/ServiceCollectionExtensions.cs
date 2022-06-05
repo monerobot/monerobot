@@ -1,4 +1,4 @@
-namespace MoneroBot.WalletRpc.DependencyInjection;
+namespace MoneroBot.WalletRpc;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

@@ -23,11 +23,6 @@ public class MoneroTransactionIdAttribute : ValidationAttribute
             && IsBase58(value);
     }
 
-    public override string FormatErrorMessage(string name)
-    {
-        return base.FormatErrorMessage(name);
-    }
-
     private static bool IsCorrectLength(object value) =>
         value is string address && address.Length == TX_ID_LENGTH;
 

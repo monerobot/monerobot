@@ -1,8 +1,7 @@
 namespace MoneroBot.Database;
 
 using Microsoft.EntityFrameworkCore;
-using MoneroBot.Database.Entities;
-using MoneroBot.Database.Entities.QueryResults;
+using Entities;
 
 public class MoneroBotContext : DbContext
 {
@@ -12,15 +11,9 @@ public class MoneroBotContext : DbContext
 
     public DbSet<Bounty> Bounties { get; set; } = null!;
 
-    public DbSet<Comment> Comments { get; set; } = null!;
-
     public DbSet<DonationAddress> DonationAddresses { get; set; } = null!;
 
     public DbSet<Donation> Donations { get; set; } = null!;
-
-    public DbSet<DonationEnote> DonationEnotes { get; set; } = null!;
-
-    public DbSet<Enote> Enotes { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,10 +26,7 @@ public class MoneroBotContext : DbContext
 
     private void RegisterQueryResultEntities(ModelBuilder modelBuilder)
     {
-        var types = new[]
-        {
-            typeof(PostNumber),
-        };
+        var types = Type.EmptyTypes;
 
         foreach (var type in types)
         {

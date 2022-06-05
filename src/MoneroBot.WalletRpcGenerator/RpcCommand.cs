@@ -1,4 +1,4 @@
-namespace MoneroPay.WalletRpcGenerator
+namespace MoneroBot.WalletRpcGenerator
 {
     internal record RpcCommand
     {

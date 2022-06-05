@@ -1,7 +1,7 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Formatting;
-using MoneroPay.WalletRpcGenerator;
-using System.Text;
+using MoneroBot.WalletRpcGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 const string WALLET_RPC_CMD_DEFS_SRC_URL = "https://raw.githubusercontent.com/monero-project/monero/master/src/wallet/wallet_rpc_server_commands_defs.h";
@@ -29,7 +29,7 @@ var @namespace = NamespaceDeclaration(IdentifierName("MoneroBot.WalletRpc.Models
         UsingDirective(ParseName("System.Collections.Generic")));
 
 var fieldTypeTypeSyntaxResolver = ModelGenerator.GetFieldTypeTypeSyntaxResolver(result.Typedefs, result.Structures);
-var defaultEqualsValueClauseResolver = ModelGenerator.GetDefaultEqualsValueCaluseSyntaxResolver();
+var defaultEqualsValueClauseResolver = ModelGenerator.GetDefaultEqualsValueClauseSyntaxResolver();
 foreach (var structure in result.Structures)
 {
     @namespace = @namespace.AddMembers(
