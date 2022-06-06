@@ -144,6 +144,22 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
             });
         }
 
+        if (edits.Any(e => e is not NoOp))
+        {
+            this.logger.LogInformation(
+                "Performing the following comment edits for post #{PostNumber} in order to synchronize the existing comments {@Comments} with the detected donations {@Donations}: {@Edits}",
+                command.PostNumber,
+                comments,
+                donations,
+                edits);
+        }
+        else
+        {
+            this.logger.LogTrace(
+                "The post #{PostNumber}'s existing comments are synchornized with the detected donations",
+                command.PostNumber);
+        }
+
         /* when 'applying' the edits we want to (where possible) firstly ensure the database matches our intentions,
          * and _then_ cause the edit to happen by calling the fider API. The reason we do this is so that if the database
          * save fails for whatever reason we avoid causing the effect without it being reflected in our internal
