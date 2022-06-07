@@ -312,7 +312,27 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
             transfers.AddRange(result.Transfers);
         }
 
-        return transfers;
+        /* it is important we order these results because we don't really want the comments to change position
+         * if we can avoid it. We want all _confirmed_ transfers to occur before the mempool transfers. Then,
+         * within the _completed_ transfers we want them ordered by their `GlobalIndex`. However, for the mempool
+         * transfers because it's up to miners to include transactions (and in which order) in blocks
+         * the best we can do is sort by timestamp... again the diffing will correct the comment order
+         * in the scenario where they end up in the blockchain in an order different to their timestamps.
+         */
+        return transfers
+            .OrderBy(t => t switch
+            {
+                ConfirmedTransfer => int.MinValue,
+                MempoolTransfer => int.MaxValue,
+                _ => throw new NotImplementedException()
+            })
+            .ThenBy(t => t switch
+            {
+                ConfirmedTransfer c => c.GlobalIndex,
+                MempoolTransfer m => m.Timestamp,
+                _ => throw new NotImplementedException()
+            })
+            .ToList();
     }
 
     private record Donation(int Order, ulong Amount, bool IsSpent, bool IsUnlocked, Transfer Transfer);
