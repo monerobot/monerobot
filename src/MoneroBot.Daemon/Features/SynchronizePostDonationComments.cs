@@ -62,7 +62,6 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
         sb.Append($"Bounty increased by {FormatAtomicAmount(CultureInfo.InvariantCulture, donation.Amount)} XMR ");
         sb.Append(donation switch
         {
-            { IsSpent: true } => "📨",
             { IsUnlocked: true } => "💰",
             { IsUnlocked: false } => "⏳"
         });
