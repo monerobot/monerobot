@@ -70,6 +70,7 @@ public class RegisterExistingBountyHandler : IRegisterExistingBountyHandler
         var bounty = new Db.Bounty((uint)post.Number, post.Slug)
         {
             DonationAddresses = addressComments
+                .DistinctBy(ac => ac.Address)
                 .Select(ac => new Db.DonationAddress(ac.Address, ac.CommentId))
                 .ToList(),
         };
