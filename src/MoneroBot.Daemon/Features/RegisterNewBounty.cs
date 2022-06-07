@@ -306,6 +306,7 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
                 preferredAddress.Address,
                 post,
                 alreadyTakenByPost);
+            return Option.None<IndexedAddress>();
         }
 
         this.logger.LogInformation(
