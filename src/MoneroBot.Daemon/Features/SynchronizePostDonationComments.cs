@@ -171,26 +171,55 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
          * this may be a good idea, however you would need another column with a flag such that you can create a
          * constraint ensuring that if only if the 'created' flag is set that the FK can be null - I'd rather not
          * do that at this stage.
-         *
-         * Also, the easiest way to implement this is to clear all the donations for a bounty and then create them
-         * as per the edits - this is a _lot_ simpler than trying to reconcile differently for each type of edit
-         * especially when you consider that our database may not have a record for existing comments/donations when
-         * restoring from the fider API!
          */
 
         await using var transaction = await context.Database.BeginTransactionAsync(token);
 
-        context.Donations.RemoveRange(bounty.Donations!);
-        await context.SaveChangesAsync(token);
-        bounty.Donations!.Clear();
-
-        static Db.Donation MapDonationToDbEntity(Donation donation, int commentId)
+        async Task ApplyEditToDbEntityAsync(Edit edit, int commentId)
         {
-            return new Db.Donation(
-                txHash: donation.Transfer.TxHash,
-                address: donation.Transfer.Destination.Address,
-                amount: donation.Transfer.Amount,
-                commentId: commentId);
+            var entity = await context.Donations
+                .FirstOrDefaultAsync(d => d.CommentId == commentId, CancellationToken.None);
+
+            if (edit is DeleteComment)
+            {
+                if (entity is not null)
+                {
+                    bounty.Donations!.Remove(entity);
+                }
+            }
+            else if (edit is UpdateComment or CreateComment or NoOp)
+            {
+                var donation = edit switch
+                {
+                    UpdateComment u => u.Donation,
+                    CreateComment c => c.Donation,
+                    NoOp n => n.Donation,
+                    _ => throw new NotImplementedException()
+                };
+
+                if (entity is null)
+                {
+                    entity = new Db.Donation(
+                        txHash: donation.Transfer.TxHash,
+                        address: donation.Transfer.Destination.Address,
+                        amount: donation.Transfer.Amount,
+                        commentId: commentId);
+                    bounty.Donations!.Add(entity);
+                }
+                else
+                {
+                    entity.CommentId = commentId;
+                    entity.TxHash = donation.Transfer.TxHash;
+                    entity.Address = donation.Transfer.Destination.Address;
+                    entity.Amount = donation.Amount;
+                }
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(edit));
+            }
+
+            await context.SaveChangesAsync(CancellationToken.None);
         }
         
         foreach (var edit in edits)
@@ -198,6 +227,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
             switch (edit)
             {
                 case DeleteComment delete:
+                    await ApplyEditToDbEntityAsync(delete, delete.CommentId);
                     await this.fider.DeleteCommentAsync(
                         (int) command.PostNumber,
                         delete.CommentId,
@@ -210,8 +240,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                  */
                 case UpdateComment update:
                 {
-                    bounty.Donations.Add(MapDonationToDbEntity(update.Donation, update.CommentId));
-                    await context.SaveChangesAsync(CancellationToken.None);
+                    await ApplyEditToDbEntityAsync(update, update.CommentId);
 
                     /* the `Donation` in the database now correctly reflects it's associated transfer - however the
                      * associated comment in Fider has the incorrect content - so we try make it match.
@@ -237,8 +266,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                         create.Content,
                         new List<ImageUpload>(),
                         CancellationToken.None);
-                    bounty.Donations.Add(MapDonationToDbEntity(create.Donation, commentId));
-                    await context.SaveChangesAsync(CancellationToken.None);
+                    await ApplyEditToDbEntityAsync(create, commentId);
                     break;
                 }
                 case NoOp noop:
@@ -247,8 +275,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                      * but the corresponding record not exist in our database. This will be the case when restoring
                      * from the fider API after deleting a database.
                      */
-                    bounty.Donations.Add(MapDonationToDbEntity(noop.Donation, noop.CommentId));
-                    await context.SaveChangesAsync(CancellationToken.None);
+                    await ApplyEditToDbEntityAsync(noop, noop.CommentId);
                     break;
                 }
                 default:
