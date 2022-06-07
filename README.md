@@ -43,36 +43,36 @@ following settings are available:
     },
     // Settings related to the daemon program itself.
     "DaemonOptions": {
-    // The account index to use when registering new bounties.
-    "WalletAccountIndex": 0,
-    // The delay which background processes wait for before starting the
-    // background action again.
-    "PollingInterval": "00:00:10",
-    // The Fider user ID of the Monero Bot account - only comments by this
-    // user will be considered when attempting to restore the database
-    // from fider state.
-    "FiderMoneroBotUserId": null
+        // The account index to use when registering new bounties.
+        "WalletAccountIndex": 0,
+        // The delay which background processes wait for before starting the
+        // background action again.
+        "PollingInterval": "00:00:10",
+        // The Fider user ID of the Monero Bot account - only comments by this
+        // user will be considered when attempting to restore the database
+        // from fider state.
+        "FiderMoneroBotUserId": null
     },
     "Fider": {
     // The Fider API key to use when creating or updating posts/comments.
-    "ApiKey": null,
-    // The address where the Fider instance is accessible (i.e https://localhost:38080).
-    "BaseAddress": null,
-    // If set the value will be used to set the X-Fider-UserID header allowing
-    // the user to be impersonated.
-    "ImpersonationUserId": null
+        "ApiKey": null,
+        // The address where the Fider instance is accessible (i.e https://localhost:38080).
+        "BaseAddress": null,
+        // If set the value will be used to set the X-Fider-UserID header allowing
+        // the user to be impersonated.
+        "ImpersonationUserId": null
     },
     "MoneroWalletRpc": {
-    // The address where a running instance of the Monero Wallet RPC server is accessible (i.e https://localhost:28083).
-    "BaseAddress": "https://localhost:28083",
-    // If provided configures the username to use when logging into the RPC server.
-    "RpcUsername": null,
-    // Can be provided along with `RpcUsername` when logging into the RPC server requires
-    // a password.
-    "RpcPassword": null,
-    // Configures whether the daemon program should accept self-signed HTTPS certificates
-    // from the Monero Wallet RPC server.
-    "AcceptSelfSignedCerts": true
+        // The address where a running instance of the Monero Wallet RPC server is accessible (i.e https://localhost:28083).
+        "BaseAddress": "https://localhost:28083",
+        // If provided configures the username to use when logging into the RPC server.
+        "RpcUsername": null,
+        // Can be provided along with `RpcUsername` when logging into the RPC server requires
+        // a password.
+        "RpcPassword": null,
+        // Configures whether the daemon program should accept self-signed HTTPS certificates
+        // from the Monero Wallet RPC server.
+        "AcceptSelfSignedCerts": true
     }
 }
 ```
