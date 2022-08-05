@@ -48,4 +48,6 @@ internal static class Endpoints
     public static string EditComment(int number, int id) => $"/api/v1/posts/{number}/comments/{id}";
 
     public static string DeleteComment(int number, int id) => $"/api/v1/posts/{number}/comments/{id}";
+
+    public static string EditPost(int number) => $"/api/v1/posts/{number}";
 }

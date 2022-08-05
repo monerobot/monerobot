@@ -2,6 +2,7 @@ namespace MoneroBot.Daemon.Features;
 
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using Database;
 using Fider;
 using Fider.Models;
@@ -14,6 +15,29 @@ public record SynchronizePostDonationComments(uint PostNumber);
 public interface ISynchronizePostDonationCommentsHandler
 {
     public Task HandleAsync(SynchronizePostDonationComments command, CancellationToken token = default);
+}
+
+public static class XmrAmountFormatter
+{
+    public const decimal ATOMIC_TO_MONERO_SCALER = 1e-12m;
+
+    public static string FormatAtomicAmount(CultureInfo culture, ulong amount, int? places = null)
+    {
+        const int MIN_PLACES = 0;
+        const int MAX_PLACES = 12;
+
+        if (places is < MIN_PLACES or > MAX_PLACES)
+        {
+            throw new ArgumentOutOfRangeException(nameof(places), "Decimal places must be between 0 and 12 inclusive.");
+        }
+
+        var moneros = amount * ATOMIC_TO_MONERO_SCALER;
+        var separator = culture.NumberFormat.NumberDecimalSeparator;
+        var format = places is not null || moneros.ToString(culture).Contains(separator)
+            ? $"0.{string.Join(string.Empty, Enumerable.Repeat('#', places ?? 12))}"
+            : "N0";
+        return moneros.ToString(format);
+    }
 }
 
 public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCommentsHandler
@@ -43,30 +67,19 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
 
     private static string FormatDonationAsComment(Donation donation, IEnumerable<Donation> all)
     {
-        static string FormatAtomicAmount(CultureInfo culture, ulong amount)
-        {
-            const decimal ATOMIC_TO_MONERO_SCALER = 1e-12m;
-            var separator = culture.NumberFormat.NumberDecimalSeparator;
-            var moneros = amount * ATOMIC_TO_MONERO_SCALER;
-            /* the ##... section is the exact length required to represent a single piconero, basically you
-             * get the decimal representation of 1e-12 and then turn all the digits into #s.
-             */
-            return moneros.ToString(culture).Contains(separator) ? $"{moneros:0.############}" : $"{moneros:N0}";
-        }
-
         var total = all
             .Where(d => d.Order <= donation.Order)
             .Aggregate(0ul, (t, d) => t + d.Amount);
-        
+
         var sb = new StringBuilder();
-        sb.Append($"Bounty increased by {FormatAtomicAmount(CultureInfo.InvariantCulture, donation.Amount)} XMR ");
+        sb.Append($"Bounty increased by {XmrAmountFormatter.FormatAtomicAmount(CultureInfo.InvariantCulture, donation.Amount)} XMR ");
         sb.Append(donation switch
         {
             { IsUnlocked: true } => "💰",
             { IsUnlocked: false } => "⏳"
         });
         sb.AppendLine();
-        sb.Append($"Total Bounty: {FormatAtomicAmount(CultureInfo.InvariantCulture, total)} XMR");
+        sb.Append($"Total Bounty: {XmrAmountFormatter.FormatAtomicAmount(CultureInfo.InvariantCulture, total)} XMR");
         return sb.ToString();
     }
 
@@ -103,7 +116,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
         }
 
         var comments =
-            (await this.getDonationComments.HandleAsync(new GetDonationComments((int) command.PostNumber), token))
+            (await this.getDonationComments.HandleAsync(new GetDonationComments((int)command.PostNumber), token))
             .OrderBy(c => c.CommentId)
             .Select(c => new Comment(CommentId: c.CommentId, Content: c.Content))
             .ToList();
@@ -143,7 +156,13 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
             });
         }
 
-        if (edits.Any(e => e is not NoOp))
+        if (edits.All(e => e is NoOp))
+        {
+            this.logger.LogTrace(
+                "The post #{PostNumber}'s existing comments are synchornized with the detected donations",
+                command.PostNumber);
+        }
+        else
         {
             this.logger.LogInformation(
                 "Performing the following comment edits for post #{PostNumber} in order to synchronize the existing comments {@Comments} with the detected donations {@Donations}: {@Edits}",
@@ -151,12 +170,6 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                 comments,
                 donations,
                 edits);
-        }
-        else
-        {
-            this.logger.LogTrace(
-                "The post #{PostNumber}'s existing comments are synchornized with the detected donations",
-                command.PostNumber);
         }
 
         /* when 'applying' the edits we want to (where possible) firstly ensure the database matches our intentions,
@@ -221,18 +234,20 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
 
             await context.SaveChangesAsync(CancellationToken.None);
         }
-        
+
         foreach (var edit in edits)
-        {   
+        {
             switch (edit)
             {
                 case DeleteComment delete:
+                {
                     await ApplyEditToDbEntityAsync(delete, delete.CommentId);
                     await this.fider.DeleteCommentAsync(
-                        (int) command.PostNumber,
+                        (int)command.PostNumber,
                         delete.CommentId,
                         CancellationToken.None);
                     break;
+                }
                 /* an _update_ edit typically means that the existing donation comments are:
                  * a) out of order,
                  * b) do not match the transfer record
@@ -241,12 +256,11 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                 case UpdateComment update:
                 {
                     await ApplyEditToDbEntityAsync(update, update.CommentId);
-
                     /* the `Donation` in the database now correctly reflects it's associated transfer - however the
                      * associated comment in Fider has the incorrect content - so we try make it match.
                      */
                     await this.fider.UpdateCommentAsync(
-                        (int) command.PostNumber,
+                        (int)command.PostNumber,
                         update.CommentId,
                         update.Content,
                         CancellationToken.None);
@@ -262,7 +276,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                      * above there are ways around this but for now this is simpler.
                      */
                     var commentId = await this.fider.PostCommentAsync(
-                        (int) command.PostNumber,
+                        (int)command.PostNumber,
                         create.Content,
                         new List<ImageUpload>(),
                         CancellationToken.None);
@@ -278,12 +292,35 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                     await ApplyEditToDbEntityAsync(noop, noop.CommentId);
                     break;
                 }
-                default:
-                    throw new NotImplementedException();
+                default: throw new NotImplementedException();
             }
         }
-            
+
+        await UpdatePostTitleToIncludeTotalDonationAmountAsync(command, donations, token);
+
         await transaction.CommitAsync(CancellationToken.None);
+    }
+
+    private async Task UpdatePostTitleToIncludeTotalDonationAmountAsync(SynchronizePostDonationComments command, List<Donation> donations, CancellationToken token)
+    {
+        var post = await this.fider.GetPostAsync((int)command.PostNumber, token);
+
+        if (post == null)
+        {
+            this.logger.LogError("Failed to retrieve post #{PostNumber} whilst updating donation amount in title", command.PostNumber);
+            return;
+        }
+
+        var amount = donations.Aggregate(0ul, (amount, d) => amount + d.Amount);
+        var moneros = amount * XmrAmountFormatter.ATOMIC_TO_MONERO_SCALER;
+        var prefix = $"{moneros:0.000}ɱ | ";
+        var current = post.Title;
+        var original = Regex.Replace(post.Title, @"^\d+\.\d+ɱ\s*\|\s*", string.Empty);
+        var expected = $"{prefix}{original}";
+        if (current != expected)
+        {
+            await this.fider.EditPostAsync((int)command.PostNumber, title: expected, token: token);
+        }
     }
 
     private async Task<IReadOnlyCollection<Transfer>?> GetOrderedDonationTransfersAsync(IEnumerable<string> addresses, CancellationToken token = default)
