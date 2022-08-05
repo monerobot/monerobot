@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8086:8080
+  seq:
+    restart: always
+    image: datalust/seq
+    ports:
+        - 8081:80
+        - 8082:5341
+    environment:
+        - ACCEPT_EULA=Y
+  email:
+    restart: always
+    image: rnwood/smtp4dev
+    ports:
+        - 8084:80
+        - 8085:25
+  fider:
+    restart: always
+    image: getfider/fider:main
+    ports:
+      - 8080:3000
+    environment:
+      BASE_URL: http://localhost:8080
+      DATABASE_URL: postgres://postgres:password@db:5432/fider?sslmode=disable
+      JWT_SECRET: strong_password
+      EMAIL_NOREPLY: noreply@bounties.monero.social
+      EMAIL_SMTP_HOST: email
+      EMAIL_SMTP_PORT: 25
+      EMAIL_SMTP_USERNAME: ""
+      EMAIL_SMTP_PASSWORD: ""
+      EMAIL_SMTP_ENABLE_STARTTLS: false
+    depends_on:
+      - db
+      - seq
+      - monerod
