@@ -84,4 +84,15 @@ public class FiderApiClient : IFiderApiClient
 
         return result;
     }
+
+    public async Task EditPostAsync(int postNumber, string title, string? description = null, CancellationToken token = default) 
+    {
+        var data = new StringContent(
+            JsonSerializer.Serialize(
+                description is null ? new { title } as object : new { title, description }),
+                Encoding.UTF8,
+                MediaTypeNames.Application.Json);
+        var response = await this.http.PutAsync(Endpoints.EditPost(postNumber), data);
+        response.EnsureSuccessStatusCode();
+    }
 }
