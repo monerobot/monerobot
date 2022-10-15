@@ -74,9 +74,16 @@ internal class BountyDonationService : IHostedService, IDisposable
             .ToListAsync(token);
         foreach (var bounty in bounties)
         {
-            await this.synchronizePostDonationComments.HandleAsync(
-                new SynchronizePostDonationComments(bounty.PostNumber),
-                token);
+            try
+            {
+                await this.synchronizePostDonationComments.HandleAsync(
+                    new SynchronizePostDonationComments(bounty.PostNumber),
+                    token);
+            }
+            catch (Exception error)
+            {
+                this.logger.LogError(error, "An unexpected error occured whilst trying to synchronize the post #{PostNumber} with the donations.", bounty.PostNumber);
+            }
         }
     }
 
