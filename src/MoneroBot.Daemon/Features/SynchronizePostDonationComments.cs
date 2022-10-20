@@ -317,9 +317,27 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
         var current = post.Title;
         var original = Regex.Replace(post.Title, @"^\d+\.\d+ɱ\s*\|\s*", string.Empty);
         var expected = $"{prefix}{original}";
-        if (current != expected)
+        if (current == expected)
         {
-            await this.fider.EditPostAsync((int)command.PostNumber, title: expected, token: token);
+            return;
+        }
+
+        const int MAX_FIDER_TITLE_LENGTH = 100;
+        if (expected.Length > MAX_FIDER_TITLE_LENGTH)
+        {
+            this.logger.LogInformation("Unable to prepend total donation amount to the title of post #{PostNumber} due to the proposed title exceeding the maximum post title length of 100 characters.", command.PostNumber);
+        }
+        else
+        {
+            try
+            {
+                await this.fider.EditPostAsync((int)command.PostNumber, title: expected, token: token);
+                this.logger.LogInformation("Successfully updated the title of post #{PostNumber} from '{PreviousTitle}' to '{NewTitle}' so as to match the new total donation amount.", command.PostNumber, current, expected);
+            }
+            catch (HttpRequestException error)
+            {
+                this.logger.LogError(error, "An unexpected error occured when attempting to update the title of post #{PostNumber} to include the total donation amount in the title.", command.PostNumber);
+            }
         }
     }
 
