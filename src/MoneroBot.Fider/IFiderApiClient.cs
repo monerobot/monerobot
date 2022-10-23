@@ -18,5 +18,5 @@ public interface IFiderApiClient
 
     public Task DeleteCommentAsync(int postNumber, int commentId, CancellationToken token = default);
 
-    public Task EditPostAsync(int postNumber, string title, string? description = null, CancellationToken token = default);
+    public Task EditPostAsync(int postNumber, string title, string? description, CancellationToken token = default);
 }
