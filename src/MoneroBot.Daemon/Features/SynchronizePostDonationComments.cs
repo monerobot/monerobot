@@ -331,7 +331,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
         {
             try
             {
-                await this.fider.EditPostAsync((int)command.PostNumber, title: expected, token: token);
+                await this.fider.EditPostAsync((int)command.PostNumber, title: expected, description: post.Description, token: token);
                 this.logger.LogInformation("Successfully updated the title of post #{PostNumber} from '{PreviousTitle}' to '{NewTitle}' so as to match the new total donation amount.", command.PostNumber, current, expected);
             }
             catch (HttpRequestException error)
