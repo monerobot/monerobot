@@ -55,6 +55,12 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
             return null;
         }
 
+        if (!post.Tags.Contains("approved"))
+        {
+            this.logger.LogInformation("Post #{PostNumber} doesn't have the 'approved' tag, skipping registration", command.PostNumber);
+            return null;
+        }
+
         await using var transaction = await context.Database.BeginTransactionAsync(token);
         try
         {
