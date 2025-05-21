@@ -30,6 +30,32 @@ appropriate. The daemon program itself expects you to have configured/have runni
 2. A [Monero Wallet RPC Server](https://www.getmonero.org/resources/developer-guides/wallet-rpc.html) instance which was launched with the `--wallet-file` argument pointing
 to the managed donation wallet.
 
+## Development
+
+To run the monerobot locally for development purposes you will need to:
+
+1. Set up `monerod` to run in testnet mode (e.g. `./monerod --testnet --no-igd --no-zmq --prune-blockchain --data-dir "/home/henry/Projects/monerobot/.bitmonero"`).
+2. Set up `monero-wallet-rpc` to run testnet mode pointing to the bounty bot's wallet (e.g. `./monero-wallet-rpc --rpc-bind-port 28083 --testnet --wallet-file monerobot --prompt-for-password --disable-rpc-login`).
+3. Create a `appsettings.Development.json` and set the appropriate overrides, for example:
+```json
+{
+    "ConnectionStrings": {
+        "MoneroBotContext": "Data Source=/home/henry/Documents/monerobot/monerobot.db"
+    },
+    "DaemonOptions": {
+        "FiderMoneroBotUserId": 1
+    },
+    "Fider": {
+        "ApiKey": "Kc0tioz9Uwyv64qkYXRJFviyCuQwT7Me3i3jGCpCyP9RNBqRwE4AU5tiuLqbtp2J",
+        "BaseAddress": "http://localhost:8080",
+        "ImpersonationUserId": 1
+    }
+}
+```
+4. Start up the development services (`seq` for logging, `smtp4dev` for email interception, `fider` for a local fider instance, `postgres` for a database, `adminer` for an interface to the database) via `docker compose -f docker-compose.dev.yml up`.
+
+Then open up fider at `http://localhost:8080`, the bot should start processing bounties. A visual studio launch profile for the daemon has been included.
+
 ## Configuration
 
 The `appsettings.json` file can be modified and placed alongside the executable to configure the daemon. The

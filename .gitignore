@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Dev Environment Artifcats
+.bitmonero
+
 # Daemon Artifacts
 *.db
 *.db-shm
