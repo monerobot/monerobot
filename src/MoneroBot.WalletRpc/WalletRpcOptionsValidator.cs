@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 public class WalletRpcOptionsValidator : IValidateOptions<WalletRpcOptions>
 {
-    public ValidateOptionsResult Validate(string name, WalletRpcOptions options)
+    public ValidateOptionsResult Validate(string? name, WalletRpcOptions options)
     {
         var sb = new StringBuilder();
 

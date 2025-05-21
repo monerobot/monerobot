@@ -39,7 +39,7 @@ var host = Host.CreateDefaultBuilder(args)
             (provider, options) =>
             {
                 var config = provider.GetRequiredService<IConfiguration>();
-                var env = provider.GetService<IHostEnvironment>();
+                var env = provider.GetRequiredService<IHostEnvironment>();
                 options
                     .UseSqlite(config.GetConnectionString("MoneroBotContext"))
                     .UseSnakeCaseNamingConvention()
