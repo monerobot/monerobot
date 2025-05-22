@@ -14,6 +14,8 @@ public interface IFiderApiClient
 
     public Task<int> PostCommentAsync(int postNumber, string content, List<ImageUpload> attachments, CancellationToken token = default);
 
+    public Task UpdateCommentAsync(int postNumber, int commentId, string content, List<ImageUpload> attachments, CancellationToken token = default);
+
     public Task UpdateCommentAsync(int postNumber, int commentId, string content, CancellationToken token = default);
 
     public Task DeleteCommentAsync(int postNumber, int commentId, CancellationToken token = default);

@@ -54,6 +54,7 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddTransient<IRegisterExistingBountyHandler, RegisterExistingBountyHandler>();
         services.AddTransient<IRegisterNewBountyHandler, RegisterNewBountyHandler>();
         services.AddTransient<ISynchronizePostDonationCommentsHandler, SynchronizePostDonationCommentsHandler>();
+        services.AddTransient<IApprovalCommentFeature, AwaitingCommentFeature>();
 
         services.AddHostedService<BountyRegistrationService>();
         services.AddHostedService<BountyDonationService>();

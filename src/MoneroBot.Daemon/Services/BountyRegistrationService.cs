@@ -12,6 +12,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
     private readonly IGetUnregisteredPostsHandler getUnregisteredPosts;
     private readonly IRegisterExistingBountyHandler registerExistingBounty;
     private readonly IRegisterNewBountyHandler registerNewBounty;
+    private readonly IApprovalCommentFeature approvalCommentFeature;
     private CancellationTokenSource? cts;
     private Timer? timer;
 
@@ -20,13 +21,15 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         ILogger<BountyRegistrationService> logger,
         IGetUnregisteredPostsHandler getUnregisteredPosts,
         IRegisterExistingBountyHandler registerExistingBounty,
-        IRegisterNewBountyHandler registerNewBounty)
+        IRegisterNewBountyHandler registerNewBounty,
+        IApprovalCommentFeature awaitingApprovalComment)
     {
         this.options = options.Value;
         this.logger = logger;
         this.getUnregisteredPosts = getUnregisteredPosts;
         this.registerExistingBounty = registerExistingBounty;
         this.registerNewBounty = registerNewBounty;
+        this.approvalCommentFeature = awaitingApprovalComment;
     }
 
     public Task StartAsync(CancellationToken token)
@@ -78,13 +81,19 @@ internal class BountyRegistrationService : IHostedService, IDisposable
         var existing = posts.Where(p => p.IsExistingBounty).ToList();
         var @new = posts.Except(existing).ToList();
 
-        /* we need to import any existing posts first because we want to avoid giving out an address which
+        /* A bounty is considered 'existing' when the bot has already posted donation address(es) for it we
+         * need to import any existing posts first because we want to avoid giving out an address which
          * is in use by a different existing post! And the only way we can check that is by first importing any
          * existing posts so that the information is in our database.
+         *
+         * Also, if a bounty already exists then it has to be considered already approved (otherwise how else
+         * could it have gotten a donation address if we require approval first? well for bounties made prior to
+         * the introduction of the 'requires approval' feature they will exist without approval but that is fine)
+         * and so we don't touch any of the 'pending approval' comments.
          */
         foreach (var post in existing)
         {
-            this.logger.LogInformation("Registering post #{PostNumber} as a  bounty", post.PostNumber);
+            this.logger.LogInformation("Registering post #{PostNumber} as a bounty", post.PostNumber);
             var id = await this.registerExistingBounty.HandleAsync(new RegisterExistingBounty(post.PostNumber), token);
             if (id is not null)
             {
@@ -107,21 +116,73 @@ internal class BountyRegistrationService : IHostedService, IDisposable
 
         foreach (var post in @new)
         {
-            this.logger.LogInformation("Importing post #{PostNumber} as a new bounty", post.PostNumber);
-            var id = await this.registerNewBounty.HandleAsync(new RegisterNewBounty(post.PostNumber, this.options.WalletAccountIndex), token);
-            if (id is not null)
-            {
-                this.logger.LogInformation(
-                    "Successfully registered a bounty (id = {BountyId}) for new post #{PostNumber}",
-                    id,
-                    post.PostNumber);
-            }
-            else
+            var isApproved = await this.approvalCommentFeature.IsPostApprovedAsync(post.PostNumber, token);
+            if (isApproved is null)
             {
                 this.logger.LogError(
-                    "Failed to register a bounty for post #{PostNumber} for an unknown reason",
+                    "Failed to determine if the bounty for post #{PostNumber} has been approved, this means we cannot proceed " +
+                    "with registering the bounty as we don't want to allow donations to posts that haven't been approved. We will try " +
+                    "again on the next tick.",
                     post.PostNumber);
-                return;
+            }
+            else if (isApproved is true)
+            {
+                var getApprovalCommentResult = await this.approvalCommentFeature.GetApprovalCommentAsync(post.PostNumber, token);
+                if (!getApprovalCommentResult.TryUnwrapValue(out var approvalComment))
+                {
+                    this.logger.LogError(
+                        "An approved bounty for post #{PostNumber} was encountered but we were not able to retrieve the approval status comment " +
+                        "due to some unknown error. The approval post is a value add so best to just move on rather hold up posting a donation address.",
+                        post.PostNumber);
+                }
+                else if (approvalComment.Comment is null)
+                {
+                    this.logger.LogWarning(
+                        "An approved bounty for post #{PostNumber} was encountered which has no approval status comment, this would be because it was posted at " +
+                        "the same time the approval status feature was deployed or if the comments were edited outside of this bot. This isn't " +
+                        "a serious error because well we'll just post a donation address. The approval post is a value add, and this code path should be " +
+                        "extreemly rare. Best to just move on rather than try to retroactively add an 'approved' comment.",
+                        post.PostNumber);
+                }
+                else if (approvalComment.Comment.IsInApprovedState is false)
+                {
+                    this.logger.LogInformation("Updating approval comment for post #{PostNumber} to the approved state", post.PostNumber);
+                    _ = await this.approvalCommentFeature.UpdateAwaitingApprovalCommentToApprovedStateAsync(post.PostNumber, token);
+                }
+
+                this.logger.LogInformation("Importing post #{PostNumber} as a new bounty", post.PostNumber);
+                var id = await this.registerNewBounty.HandleAsync(new RegisterNewBounty(post.PostNumber, this.options.WalletAccountIndex), token);
+                if (id is not null)
+                {
+                    this.logger.LogInformation(
+                        "Successfully registered a bounty (id = {BountyId}) for new post #{PostNumber}",
+                        id,
+                        post.PostNumber);
+                }
+                else
+                {
+                    this.logger.LogError(
+                        "Failed to register a bounty for post #{PostNumber} for an unknown reason",
+                        post.PostNumber);
+                    return;
+                }
+            }
+            else if (isApproved is false)
+            {
+                var getApprovalCommentResult = await this.approvalCommentFeature.GetApprovalCommentAsync(post.PostNumber, token);
+                if (!getApprovalCommentResult.TryUnwrapValue(out var maybeApprovalComment))
+                {
+                    this.logger.LogError(
+                        "An unregistered bounty for post #{PostNumber} was found but we couldn't determine if the approval comment was already posted due to an unknown error. " +
+                        "We don't want to proceed with trying to create an approval comment because it could already have one! We'd rather be conservative and " +
+                        "not spam the bounty with awaiting approval comments.",
+                        post.PostNumber);
+                }
+                else if (maybeApprovalComment.Comment is null)
+                {
+                    this.logger.LogInformation("Posting an awaiting approval comment for post #{PostNumber}", post.PostNumber);
+                    _ = await this.approvalCommentFeature.PostAwaitingApprovalCommentAsync(post.PostNumber, token);
+                }
             }
         }
     }

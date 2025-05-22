@@ -66,6 +66,16 @@ public class FiderApiClient : IFiderApiClient
         await this.ProcessResponseAsync<JsonNode>(response, token);
     }
 
+    public async Task UpdateCommentAsync(int postNumber, int commentId, string content, List<ImageUpload> attachments, CancellationToken token = default)
+    {
+        var data = new StringContent(
+            JsonSerializer.Serialize(new { content, attachments }, this.jsonOptions),
+            Encoding.UTF8,
+            MediaTypeNames.Application.Json);
+        var response = await this.http.PutAsync(Endpoints.EditComment(number: postNumber, id: commentId), data);
+        await this.ProcessResponseAsync<JsonNode>(response, token);
+    }
+
     public async Task DeleteCommentAsync(int postNumber, int commentId, CancellationToken token = default)
     {
         var response = await this.http.DeleteAsync(Endpoints.DeleteComment(postNumber, commentId), token);
