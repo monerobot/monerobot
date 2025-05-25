@@ -6,15 +6,17 @@ public interface IFiderApiClient
 {
     public Task<Post> GetPostAsync(int number, CancellationToken token = default);
 
-    public Task<List<Post>> GetPostsAsync(int count, CancellationToken token = default);
+    public Task<bool> DoesPostExistAsync(int number, CancellationToken token = default);
+
+    public Task<Post[]> GetPostsAsync(int count, CancellationToken token = default);
 
     public Task<Post?> GetLatestPostAsync(CancellationToken token = default);
 
-    public Task<List<Comment>> ListCommentsAsync(int postNumber, int number, CancellationToken token = default);
+    public Task<Comment[]> ListCommentsAsync(int postNumber, int number, CancellationToken token = default);
 
-    public Task<int> PostCommentAsync(int postNumber, string content, List<ImageUpload> attachments, CancellationToken token = default);
+    public Task<int> PostCommentAsync(int postNumber, string content, ImageAttachment[] attachments, CancellationToken token = default);
 
-    public Task UpdateCommentAsync(int postNumber, int commentId, string content, List<ImageUpload> attachments, CancellationToken token = default);
+    public Task UpdateCommentAsync(int postNumber, int commentId, string content, ImageAttachment[] attachments, CancellationToken token = default);
 
     public Task UpdateCommentAsync(int postNumber, int commentId, string content, CancellationToken token = default);
 

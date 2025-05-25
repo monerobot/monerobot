@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 public record GetUnregisteredPosts;
 
-public record UnregisteredPost(int PostNumber, bool IsExistingBounty);
+public record UnregisteredPost(int PostNumber, bool HasExistingDonationComment);
 
 public interface IGetUnregisteredPostsHandler
 {
@@ -80,7 +80,7 @@ public class GetUnregisteredPostsHandler : IGetUnregisteredPostsHandler
                 var post = await this.fider.GetPostAsync(number, token);
                 var addresses = await this.getDonationAddressComments.HandleAsync(new GetDonationAddressComments(number), token);
                 var isExistingBounty = addresses is not [];
-                result.Add(new UnregisteredPost(PostNumber: number, IsExistingBounty: isExistingBounty));
+                result.Add(new UnregisteredPost(PostNumber: number, HasExistingDonationComment: isExistingBounty));
             }
             catch (HttpRequestException exception) when (exception.StatusCode is HttpStatusCode.NotFound)
             {

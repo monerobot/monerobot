@@ -1,3 +1,3 @@
 namespace MoneroBot.Fider.Models;
 
-public record Comment(int Id, string Content, DateTime CreatedAt, User User);
+public record Comment(int Id, string Content, string[]? Attachments, DateTime CreatedAt, User User);
