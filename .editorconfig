@@ -7,6 +7,9 @@ insert_final_newline = true
 charset = utf-8
 
 [*.cs]
+# Enable enum pattern matching exhaustiveness
+dotnet_diagnostic.CS8509.severity=error # missing switch case for named enum value
+dotnet_diagnostic.CS8524.severity=none # missing switch case for unnamed enum value
 # These both throw exceptions...
 dotnet_diagnostic.SA1649.severity = None
 dotnet_diagnostic.SA1201.severity = None

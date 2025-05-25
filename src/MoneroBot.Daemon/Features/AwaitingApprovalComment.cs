@@ -1,31 +1,29 @@
 namespace MoneroBot.Daemon.Features;
 
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MoneroBot.Daemon.Errors;
 using MoneroBot.Fider;
 using MoneroBot.Fider.Models;
 
-public record GetApprovalCommentResult(ApprovalComment? Comment)
+public enum PostAppovalState
 {
-    [MemberNotNullWhen(true, nameof(Comment))]
-    public bool HasComment => Comment is not null;
+    None,
+    Approved,
+    Rejected
 }
 
-public record ApprovalComment(int CommentId, bool IsInApprovedState);
-
-public record UpdateApprovalCommentResult(bool WasPresent, bool WasUpdated, ApprovalComment? Comment);
-
-public interface IApprovalCommentFeature
+public enum ApprovalCommentState
 {
-    public Task<bool?> IsPostApprovedAsync(int postNumber, CancellationToken token);
-
-    public Task<Option<GetApprovalCommentResult>> GetApprovalCommentAsync(int postNumber, CancellationToken token);
-
-    public Task<Option<ApprovalComment>> PostAwaitingApprovalCommentAsync(int postNumber, CancellationToken token = default);
-
-    public Task<Option<UpdateApprovalCommentResult>> UpdateAwaitingApprovalCommentToApprovedStateAsync(int postNumber, CancellationToken token = default);
+    None,
+    AwaitingApproval,
+    Approved,
+    Rejected
 }
+
+public record ApprovalComment(int CommentId, ApprovalCommentState State);
+
+public record ApprovalCommentUpdateResult(bool WasPresent, bool WasUpdated, ApprovalComment? Comment);
 
 internal static partial class ApprovalCommentTexts
 {
@@ -33,26 +31,49 @@ internal static partial class ApprovalCommentTexts
 
     public const string HasBeenApprovedMessage = @"This bounty has been approved (congratulations!), take a look below for a comment from myself to find the donation address details!";
 
+    public const string HasBeenRejectedMessage = @"This bounty has been rejected (sorry!), take a look below for a comment from an admin that'll explain why it was rejected.";
+
     public const string ApprovedTag = "approved";
+
+    public const string RejectedTag = "rejected";
 }
+
+public interface IApprovalCommentFeature
+{
+    public Task<Result<PostAppovalState, FiderError>> GetPostApprovalState(int postNumber, CancellationToken token);
+
+    public Task<Result<ApprovalComment?, FiderError>> GetApprovalCommentAsync(int postNumber, CancellationToken token);
+
+    public Task<Result<ApprovalComment, FiderError>> PostAwaitingApprovalCommentAsync(int postNumber, CancellationToken token = default);
+
+    public Task<Result<ApprovalCommentUpdateResult, FiderError>> UpdateAwaitingApprovalCommentToApprovedStateAsync(int postNumber, CancellationToken token = default);
+
+    public Task<Result<ApprovalCommentUpdateResult, FiderError>> UpdateAwaitingApprovalCommentToRejectedStateAsync(int postNumber, CancellationToken token = default);
+}
+
 
 public class AwaitingCommentFeature(IFiderApiClient fider, ILogger<AwaitingCommentFeature> logger, IOptions<DaemonOptions> options) : IApprovalCommentFeature
 {
-    public async Task<bool?> IsPostApprovedAsync(int postNumber, CancellationToken token)
+    public async Task<Result<PostAppovalState, FiderError>> GetPostApprovalState(int postNumber, CancellationToken token)
     {
         try
         {
             var post = await fider.GetPostAsync(postNumber, token);
-            return post.Tags.Contains(ApprovalCommentTexts.ApprovedTag, StringComparer.OrdinalIgnoreCase);
+
+            var state = PostAppovalState.None;
+            if (post.Tags.Contains(ApprovalCommentTexts.ApprovedTag, StringComparer.OrdinalIgnoreCase)) state = PostAppovalState.Approved;
+            if (post.Tags.Contains(ApprovalCommentTexts.RejectedTag, StringComparer.OrdinalIgnoreCase)) state = PostAppovalState.Rejected;
+
+            return Result<PostAppovalState, FiderError>.Ok(state);
         }
         catch (HttpRequestException exception)
         {
             logger.LogError(exception, "Failed to fetch the post #{PostNumber} and so the approval status could not be determined", postNumber);
-            return default;
+            return Result<PostAppovalState, FiderError>.Err(new FiderError.ApiError(exception));
         }
     }
 
-    public async Task<Option<GetApprovalCommentResult>> GetApprovalCommentAsync(int postNumber, CancellationToken token = default)
+    public async Task<Result<ApprovalComment?, FiderError>> GetApprovalCommentAsync(int postNumber, CancellationToken token = default)
     {
         List<Comment> comments;
         try
@@ -63,7 +84,7 @@ public class AwaitingCommentFeature(IFiderApiClient fider, ILogger<AwaitingComme
         catch (HttpRequestException exception)
         {
             logger.LogError(exception, "Failed to fetch the comments for post #{PostNumber} and so the approval comment could not be searched for", postNumber);
-            return Option.None<GetApprovalCommentResult>();
+            return Result<ApprovalComment?, FiderError>.Err(new FiderError.ApiError(exception));
         }
 
         foreach (var comment in comments)
@@ -75,21 +96,30 @@ public class AwaitingCommentFeature(IFiderApiClient fider, ILogger<AwaitingComme
 
             var matchesAwaitingApprovalMessage = comment.Content.Contains(ApprovalCommentTexts.AwaitingApprovalMessage, StringComparison.OrdinalIgnoreCase);
             var matchesHasBeenApprovedMessage = comment.Content.Contains(ApprovalCommentTexts.HasBeenApprovedMessage, StringComparison.OrdinalIgnoreCase);
-            var isApprovalComment = matchesAwaitingApprovalMessage || matchesHasBeenApprovedMessage;
+            var matchesHasBeenRejectedMessage = comment.Content.Contains(ApprovalCommentTexts.HasBeenRejectedMessage, StringComparison.OrdinalIgnoreCase);
+            var isApprovalComment = matchesAwaitingApprovalMessage || matchesHasBeenApprovedMessage || matchesHasBeenRejectedMessage;
 
             if (isApprovalComment is false)
             {
                 continue;
             }
 
-            return Option.For(new GetApprovalCommentResult(new ApprovalComment(comment.Id, IsInApprovedState: matchesHasBeenApprovedMessage)));
+            var state = matchesAwaitingApprovalMessage
+                ? ApprovalCommentState.AwaitingApproval
+                : matchesHasBeenApprovedMessage
+                    ? ApprovalCommentState.Approved
+                    : matchesHasBeenRejectedMessage
+                        ? ApprovalCommentState.Rejected
+                        : ApprovalCommentState.None;
+
+            return Result<ApprovalComment?, FiderError>.Ok(new ApprovalComment(comment.Id, state));
         }
 
-        return Option.For(new GetApprovalCommentResult(Comment: null));
+        return Result<ApprovalComment?, FiderError>.Ok(default);
     }
 
 
-    public async Task<Option<ApprovalComment>> PostAwaitingApprovalCommentAsync(int postNumber, CancellationToken token = default)
+    public async Task<Result<ApprovalComment, FiderError>> PostAwaitingApprovalCommentAsync(int postNumber, CancellationToken token = default)
     {
         try
         {
@@ -112,50 +142,61 @@ public class AwaitingCommentFeature(IFiderApiClient fider, ILogger<AwaitingComme
                 new { Content = content },
                 postNumber);
 
-            return Option.For((await GetApprovalCommentAsync(postNumber, token)).Unwrap()?.Comment);
+            var result = await GetApprovalCommentAsync(postNumber, token);
+            return result
+                .ErrIf(
+                    comment => comment is null,
+                    new FiderError.UnexpectedResult("The call to create a comment succeeded but the comment could not then be found"))
+                .Map(comment => comment!);
         }
         catch (HttpRequestException exception)
         {
             logger.LogError(exception, "Failed to create an approval comment for post #{PostNumber}", postNumber);
-            return Option.None<ApprovalComment>();
+            return Result<ApprovalComment, FiderError>.Err(new FiderError.ApiError(exception));
         }
     }
 
-    public async Task<Option<UpdateApprovalCommentResult>> UpdateAwaitingApprovalCommentToApprovedStateAsync(int postNumber, CancellationToken token = default)
+    public async Task<Result<ApprovalCommentUpdateResult, FiderError>> UpdateAwaitingApprovalCommentToApprovedStateAsync(int postNumber, CancellationToken token = default)
     {
-        var comment = (await GetApprovalCommentAsync(postNumber, token)).Unwrap()?.Comment;
+        var commentResult = await GetApprovalCommentAsync(postNumber, token);
 
-        if (comment is null)
+        if (commentResult.IsErr(out var error, out var comment))
         {
             logger.LogInformation(
                 "The approval comment for post #{PostNumber} could not be found either because of an error or because doesn't exist, and so it could not be transitioned to the approved state.",
                 postNumber);
-            return Option.For(new UpdateApprovalCommentResult(WasPresent: false, WasUpdated: false, Comment: null));
+            return Result<ApprovalCommentUpdateResult, FiderError>.Err(error);
         }
 
-        if (comment.IsInApprovedState)
+        if (comment.State is ApprovalCommentState.Approved)
         {
             logger.LogInformation(
                 "The approval comment for post #{PostNumber} is already in the approved state so there is nothing to be updated",
                 postNumber);
-            return Option.For(new UpdateApprovalCommentResult(WasPresent: true, WasUpdated: false, Comment: comment));
+            return Result<ApprovalCommentUpdateResult, FiderError>.Ok(new ApprovalCommentUpdateResult(WasPresent: true, WasUpdated: false, Comment: comment));
         }
 
         try
         {
             var content = $"{ApprovalCommentTexts.HasBeenApprovedMessage}\n";
-            var attachment = new ImageUpload(
-                BlobKey: $"post_{postNumber}_approved_banner",
-                Upload: new ImageUploadData(
-                    FileName: "approved-banner",
-                    ContentType: "image/png",
-                    Content: await File.ReadAllBytesAsync("./Assets/approved-banner.png", token)),
-                Remove: false);
             await fider.UpdateCommentAsync(
                 postNumber,
                 comment.CommentId,
-                content,
-                [attachment],
+                content: content,
+                attachments:
+                [
+                     new ImageUpload(
+                        BlobKey: $"post_${postNumber}_awaiting_approval_banner",
+                        Upload: null,
+                        Remove: true),
+                     new ImageUpload(
+                        BlobKey: $"post_{postNumber}_approved_banner",
+                        Upload: new ImageUploadData(
+                            FileName: "approved-banner",
+                            ContentType: "image/png",
+                            Content: await File.ReadAllBytesAsync("./Assets/approved-banner.png", token)),
+                        Remove: false)
+                ],
                 token);
             logger.LogInformation(
                 "Successfully updated the approval comment ({CommentId}) {@Comment} for post #{PostNumber} to the approved state",
@@ -163,13 +204,75 @@ public class AwaitingCommentFeature(IFiderApiClient fider, ILogger<AwaitingComme
                 new { Content = content },
                 postNumber);
 
-            comment = (await GetApprovalCommentAsync(postNumber, token)).Unwrap()?.Comment;
-            return Option.For(new UpdateApprovalCommentResult(WasPresent: true, WasUpdated: true, Comment: comment));
+            comment = (await GetApprovalCommentAsync(postNumber, token)).Unwrap();
+            return Result<ApprovalCommentUpdateResult, FiderError>.Ok(new ApprovalCommentUpdateResult(WasPresent: true, WasUpdated: true, Comment: comment));
         }
         catch (HttpRequestException exception)
         {
             logger.LogError(exception, "Failed to update approval comment ({@Comment}) for post #{PostNumber} to the approved state", comment, postNumber);
-            return Option.For(new UpdateApprovalCommentResult(WasPresent: true, WasUpdated: false, Comment: comment));
+            return Result<ApprovalCommentUpdateResult, FiderError>.Ok(new ApprovalCommentUpdateResult(WasPresent: true, WasUpdated: false, Comment: comment));
+        }
+    }
+
+    public async Task<Result<ApprovalCommentUpdateResult, FiderError>> UpdateAwaitingApprovalCommentToRejectedStateAsync(int postNumber, CancellationToken token = default)
+    {
+        var commentResult = await GetApprovalCommentAsync(postNumber, token);
+
+        if (commentResult.IsErr(out var error, out var comment))
+        {
+            logger.LogInformation(
+                "The approval comment for post #{PostNumber} could not be found either because of an error or because doesn't exist, and so it could not be transitioned to the rejected state.",
+                postNumber);
+            return Result<ApprovalCommentUpdateResult, FiderError>.Err(error);
+        }
+
+        if (comment.State is ApprovalCommentState.Rejected)
+        {
+            logger.LogInformation(
+                "The approval comment for post #{PostNumber} is already in the rejected state so there is nothing to be updated",
+                postNumber);
+            return Result<ApprovalCommentUpdateResult, FiderError>.Ok(new ApprovalCommentUpdateResult(WasPresent: true, WasUpdated: false, Comment: comment));
+        }
+
+        try
+        {
+            var content = $"{ApprovalCommentTexts.HasBeenRejectedMessage}\n";
+            await fider.UpdateCommentAsync(
+                postNumber,
+                comment.CommentId,
+                content: content,
+                attachments:
+                [
+                    new ImageUpload(
+                        BlobKey: $"post_${postNumber}_awaiting_approval_banner",
+                        Upload: null,
+                        Remove: true),
+                     new ImageUpload(
+                        BlobKey: $"post_${postNumber}_approved_banner",
+                        Upload: null,
+                        Remove: true),
+                     new ImageUpload(
+                        BlobKey: $"post_{postNumber}_rejected_banner",
+                        Upload: new ImageUploadData(
+                            FileName: "rejected-banner",
+                            ContentType: "image/png",
+                            Content: await File.ReadAllBytesAsync("./Assets/rejected-banner.png", token)),
+                        Remove: false)
+                ],
+                token);
+            logger.LogInformation(
+                "Successfully updated the approval comment ({CommentId}) {@Comment} for post #{PostNumber} to the rejected state",
+                comment.CommentId,
+                new { Content = content },
+                postNumber);
+
+            comment = (await GetApprovalCommentAsync(postNumber, token)).Unwrap();
+            return Result<ApprovalCommentUpdateResult, FiderError>.Ok(new ApprovalCommentUpdateResult(WasPresent: true, WasUpdated: true, Comment: comment));
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogError(exception, "Failed to update approval comment ({@Comment}) for post #{PostNumber} to the rejected state", comment, postNumber);
+            return Result<ApprovalCommentUpdateResult, FiderError>.Err(new FiderError.ApiError(exception));
         }
     }
 }

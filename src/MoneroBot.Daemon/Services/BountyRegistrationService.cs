@@ -116,26 +116,30 @@ internal class BountyRegistrationService : IHostedService, IDisposable
 
         foreach (var post in @new)
         {
-            var isApproved = await this.approvalCommentFeature.IsPostApprovedAsync(post.PostNumber, token);
-            if (isApproved is null)
+            var postApprovalStateResult = await this.approvalCommentFeature.GetPostApprovalState(post.PostNumber, token);
+            if (postApprovalStateResult.IsErr(out var postApprovalStateErr, out var postApprovalState))
             {
                 this.logger.LogError(
-                    "Failed to determine if the bounty for post #{PostNumber} has been approved, this means we cannot proceed " +
-                    "with registering the bounty as we don't want to allow donations to posts that haven't been approved. We will try " +
-                    "again on the next tick.",
-                    post.PostNumber);
+                    "Failed to determine if the bounty for post #{PostNumber} has been approved or rejected, this means we cannot proceed " +
+                    "with registering the bounty as we don't want to allow donations to posts that haven't been approved or have been rejected. " +
+                    "We will try again on the next tick. {@Error}",
+                    post.PostNumber,
+                    postApprovalStateErr);
+                continue;
             }
-            else if (isApproved is true)
+
+            var approvalCommentResult = await this.approvalCommentFeature.GetApprovalCommentAsync(post.PostNumber, token);
+            if (postApprovalState is PostAppovalState.Approved)
             {
-                var getApprovalCommentResult = await this.approvalCommentFeature.GetApprovalCommentAsync(post.PostNumber, token);
-                if (!getApprovalCommentResult.TryUnwrapValue(out var approvalComment))
+                if (approvalCommentResult.IsErr(out var approvalCommentErr, out var approvalComment))
                 {
                     this.logger.LogError(
                         "An approved bounty for post #{PostNumber} was encountered but we were not able to retrieve the approval status comment " +
-                        "due to some unknown error. The approval post is a value add so best to just move on rather hold up posting a donation address.",
-                        post.PostNumber);
+                        "due to an error. The approval post is a value add so best to just move on rather hold up posting a donation address. {@Error}",
+                        post.PostNumber,
+                        approvalCommentErr);
                 }
-                else if (approvalComment.Comment is null)
+                else if (approvalComment is null)
                 {
                     this.logger.LogWarning(
                         "An approved bounty for post #{PostNumber} was encountered which has no approval status comment, this would be because it was posted at " +
@@ -144,7 +148,7 @@ internal class BountyRegistrationService : IHostedService, IDisposable
                         "extreemly rare. Best to just move on rather than try to retroactively add an 'approved' comment.",
                         post.PostNumber);
                 }
-                else if (approvalComment.Comment.IsInApprovedState is false)
+                else if (approvalComment.State is not ApprovalCommentState.AwaitingApproval)
                 {
                     this.logger.LogInformation("Updating approval comment for post #{PostNumber} to the approved state", post.PostNumber);
                     _ = await this.approvalCommentFeature.UpdateAwaitingApprovalCommentToApprovedStateAsync(post.PostNumber, token);
@@ -167,18 +171,18 @@ internal class BountyRegistrationService : IHostedService, IDisposable
                     return;
                 }
             }
-            else if (isApproved is false)
+            else if (postApprovalState is PostAppovalState.None)
             {
-                var getApprovalCommentResult = await this.approvalCommentFeature.GetApprovalCommentAsync(post.PostNumber, token);
-                if (!getApprovalCommentResult.TryUnwrapValue(out var maybeApprovalComment))
+                if (approvalCommentResult.IsErr(out var approvalCommentErr, out var approvalComment))
                 {
                     this.logger.LogError(
                         "An unregistered bounty for post #{PostNumber} was found but we couldn't determine if the approval comment was already posted due to an unknown error. " +
                         "We don't want to proceed with trying to create an approval comment because it could already have one! We'd rather be conservative and " +
-                        "not spam the bounty with awaiting approval comments.",
-                        post.PostNumber);
+                        "not spam the bounty with awaiting approval comments. {@Error}",
+                        post.PostNumber,
+                        approvalCommentErr);
                 }
-                else if (maybeApprovalComment.Comment is null)
+                else if (approvalComment is null)
                 {
                     this.logger.LogInformation("Posting an awaiting approval comment for post #{PostNumber}", post.PostNumber);
                     _ = await this.approvalCommentFeature.PostAwaitingApprovalCommentAsync(post.PostNumber, token);
