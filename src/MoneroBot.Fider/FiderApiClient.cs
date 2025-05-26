@@ -33,17 +33,14 @@ public class FiderApiClient : IFiderApiClient
     public async Task<bool> DoesPostExistAsync(int number, CancellationToken token = default)
     {
         var response = await this.http.GetAsync(Endpoints.GetPost(number: number), token);
-        if (response.IsSuccessStatusCode)
-        {
-            return true;
-        }
-        else if (response.StatusCode is HttpStatusCode.NotFound)
+
+        if (response.StatusCode is HttpStatusCode.NotFound)
         {
             return false;
         }
 
         response.EnsureSuccessStatusCode();
-        throw new UnreachableException("If the response was successfull it would've already returned true, therefore by here it must be an unsuccessful one and thus thave thrown.");
+        return true;
     }
 
     public async Task<Post?> GetLatestPostAsync(CancellationToken token = default)
