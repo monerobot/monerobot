@@ -269,7 +269,7 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
 
         if (getAddressResponse.Error is { } getAddressErr)
         {
-            this.logger.LogCritical(
+            this.logger.LogError(
                 "Failed to retrieve the the address belonging to account #{AccountNumber} at index {SubaddressIndex} for post #{PostNumber}: {@WalletRpcError}",
                 accountIndex,
                 subaddressIndex,
@@ -280,7 +280,7 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
 
         if (getAddressResponse.Result is null || getAddressResponse.Result.Addresses?.Count is not > 0)
         {
-            this.logger.LogCritical(
+            this.logger.LogError(
                 "Failed to retrieve the the address belonging to account #{AccountNumber} at index {SubaddressIndex} for post {@Post} - the RPC server responded but with no result",
                 accountIndex,
                 subaddressIndex,
@@ -320,10 +320,10 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
         if (balance.Balance is > 0)
         {
             this.logger.LogWarning(
-                "The donation address {@Address} for {@Post} is already in use with a balance of {@Balance}",
+                "The donation address {@Address} is already in use with a balance of {@Balance} and so it cannot be used for post {@Post}",
                 address,
-                post,
-                balance);
+                balance,
+                post);
             return Option.None<IndexedAddress>();
         }
 
@@ -334,15 +334,15 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
         if (alreadyTakenByPost is not null)
         {
             this.logger.LogWarning(
-                "The donation address {Address} for post {@Post} is already in use by another post {@OtherPost}",
+                "The donation address {Address} is already in use by another post {@OtherPost} and so cannot be used for post {@Post}",
                 address.Address,
-                post,
-                alreadyTakenByPost);
+                alreadyTakenByPost,
+                post);
             return Option.None<IndexedAddress>();
         }
 
         this.logger.LogInformation(
-            "The donation address {Address} for {@Post} is available",
+            "The donation address {Address} for {@Post} is available for use",
             address.Address,
             post);
         return Option.Some(new IndexedAddress(address.Address, accountIndex, address.AddressIndex));
