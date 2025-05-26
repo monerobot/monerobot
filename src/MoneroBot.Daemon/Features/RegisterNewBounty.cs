@@ -192,7 +192,18 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
             "The preferred donation address for post {@Post} could not be determined, or, is not available and so fallback address will be generated for use",
             post);
 
-        for (var attempt = 1; attempt <= post.Number; attempt++)
+        /*
+        * The scenario where the loop executes multiple times is kind of an edge case. Essentially, if after having registered some bounties
+        * (posting QR code and associating an address) you delete the wallet cache and then post a bounty, it will try to re-use address
+        * at index 0 (because `create_address` just creates them from the last used index according to the cache). This is an issue because
+        * it would result in the address being used for multiple bounties! The database has a `CHECK` to prevent this being saved but best
+        * to nip the possibility in the bud here by _verifiying_ the address isn't in use. The problem here is that to get a valid unused address
+        * you need to call the `create_address` method `N+1` times where `N` is the number of bounties that were registered. The choice of `N+1`
+        * has _some_ logic but I am just adding an upper bound on how many times it tries (a `do { } (while true);` is conceptually the
+        * most appropriate - I just didn't want to leave an unbounded loop). If it fails to find an address it will go to the `RegisterNewBounty` branch
+        * that logs it can't create an address and then move onto the next bounty. So in this way it will reach a usable bounty address eventually...
+        */
+        for (var attempt = 1; attempt <= post.Number + 1; attempt++)
         {
             this.logger.LogInformation(
                 "Trying to create a donation address for post #{PostNumber} (currently on attempt #{AttemptNumber})",
