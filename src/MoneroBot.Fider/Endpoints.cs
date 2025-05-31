@@ -8,7 +8,7 @@ internal static class Endpoints
 
     public static string ListPosts(string? query = null, string? view = null, int? limit = null, string? tags = null)
     {
-        var @params = new Dictionary<string, string>();
+        var @params = new Dictionary<string, string?>();
         if (query is not null)
         {
             @params.Add("query", query);
@@ -34,7 +34,7 @@ internal static class Endpoints
 
     public static string ListComments(int number, int? count)
     {
-        var @params = new Dictionary<string, string>();
+        var @params = new Dictionary<string, string?>();
         if (count is not null)
         {
             @params.Add("number", count.Value.ToString());

@@ -1,6 +1,53 @@
 namespace MoneroBot.Daemon;
 
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+
+public sealed record Result<T, E>
+{
+    private readonly bool _isOk;
+    private readonly T? _value;
+    private readonly E? _error;
+
+    private Result(bool isOk, T? value = default, E? error = default)
+    {
+        this._isOk = isOk;
+        this._value = value;
+        this._error = error;
+    }
+
+    public T? Unwrap() => _value;
+
+    public bool IsOk([NotNullWhen(true)] out T? value, [NotNullWhen(false)] out E? error)
+    {
+        value = this._value;
+        error = this._error;
+        return this._isOk;
+    }
+
+    public bool IsOk([NotNullWhen(true)] out T? value) => IsOk(out value, out _);
+
+    public bool IsErr([NotNullWhen(true)] out E? error) => IsOk(out _, out error) is false;
+
+    public bool IsErr([NotNullWhen(true)] out E? error, [NotNullWhen(false)] out T? value) => !IsOk(out value, out error);
+
+    public Result<N, E> Map<N>(Func<T, N> selector) => IsOk(out var value, out var error)
+        ? Result<N, E>.Ok(selector(value))
+        : Result<N, E>.Err(error);
+
+    public Result<T, E> ErrIf(Func<T, bool> predicate, E error) => IsOk(out var value, out var _) && predicate(value) is false
+        ? Err(error)
+        : this;
+
+    public async ValueTask<Result<N, E>> MapAsync<N>(Func<T, ValueTask<N>> selector) => IsOk(out var value, out var error)
+        ? Result<N, E>.Ok(await selector(value))
+        : Result<N, E>.Err(error);
+
+    public static Result<T, E> Ok(T value) => new(isOk: true, value: value);
+
+    public static Result<T, E> Err(E error) => new(isOk: false, error: error);
+}
 
 public record Option<T>
         where T : notnull

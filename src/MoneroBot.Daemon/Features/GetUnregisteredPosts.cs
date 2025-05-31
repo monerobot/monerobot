@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 public record GetUnregisteredPosts;
 
-public record UnregisteredPost(int PostNumber, bool IsExistingBounty);
+public record UnregisteredPost(int PostNumber, bool HasExistingDonationComment);
 
 public interface IGetUnregisteredPostsHandler
 {
@@ -22,17 +22,20 @@ public class GetUnregisteredPostsHandler : IGetUnregisteredPostsHandler
     private readonly ILogger<GetUnregisteredPostsHandler> logger;
     private readonly IFiderApiClient fider;
     private readonly IGetDonationAddressCommentsHandler getDonationAddressComments;
+    private readonly IApprovalCommentFeature awaitingApprovalCommentHandler;
 
     public GetUnregisteredPostsHandler(
         IDbContextFactory<MoneroBotContext> contextFactory,
         ILogger<GetUnregisteredPostsHandler> logger,
         IFiderApiClient fider,
-        IGetDonationAddressCommentsHandler getDonationAddressComments)
+        IGetDonationAddressCommentsHandler getDonationAddressComments,
+        IApprovalCommentFeature awaitingApprovalCommentHandler)
     {
         this.contextFactory = contextFactory;
         this.logger = logger;
         this.fider = fider;
         this.getDonationAddressComments = getDonationAddressComments;
+        this.awaitingApprovalCommentHandler = awaitingApprovalCommentHandler;
     }
 
     public async Task<List<UnregisteredPost>> HandleAsync(GetUnregisteredPosts command, CancellationToken token = default)
@@ -71,13 +74,13 @@ public class GetUnregisteredPostsHandler : IGetUnregisteredPostsHandler
             try
             {
                 /* we make this request to just check the post exists - if the requested failed with a 404 the
-                 * `HTTPRequestException would have been raised... yeah exception control flow but it is the
+                 * `HTTPRequestException` would have been raised... yeah exception control flow but it is the
                  * way it's done for this specific scenario in C# land.
                  */
-                _ = await this.fider.GetPostAsync(number, token);
+                var post = await this.fider.GetPostAsync(number, token);
                 var addresses = await this.getDonationAddressComments.HandleAsync(new GetDonationAddressComments(number), token);
-                /* a bounty is considered 'existing' when the bot has already posted donation address(es) for it */
-                result.Add(new UnregisteredPost(PostNumber: number, IsExistingBounty: addresses.Any()));
+                var isExistingBounty = addresses is not [];
+                result.Add(new UnregisteredPost(PostNumber: number, HasExistingDonationComment: isExistingBounty));
             }
             catch (HttpRequestException exception) when (exception.StatusCode is HttpStatusCode.NotFound)
             {

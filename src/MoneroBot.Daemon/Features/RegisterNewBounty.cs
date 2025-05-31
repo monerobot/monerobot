@@ -118,20 +118,19 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
             $"[{address}]({paymentUrl}) \n" +
             "Your donation will be reflected in the comments. \n" +
             "Payouts will be made once the bounty is complete to the individual(s) who completed the bounty first. \n";
-        var attachment = new ImageUpload(
-            BlobKey: $"post_{post.Number}",
-            Upload: new ImageUploadData(
+        var attachment = ImageAttachment.Addition(
+            blobKey: $"post_{post.Number}",
+            upload: new ImageUploadData(
                 FileName: $"post_{post.Number}",
                 ContentType: "image/png",
-                Content: qrCode.GetGraphic(20)),
-            Remove: false);
+                Content: qrCode.GetGraphic(20)));
 
         try
         {
             var commentId = await this.fider.PostCommentAsync(
                 post.Number,
                 content,
-                new List<ImageUpload> { attachment },
+                [attachment],
                 CancellationToken.None);
             this.logger.LogInformation(
                 "Successfully created a donation address comment ({CommentId}) {@Comment} for post {@Post}",
@@ -183,53 +182,86 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
          * wallet2.h: size_t get_num_subaddresses(uint32_t index_major) const { return index_major < m_subaddress_labels.size() ? m_subaddress_labels[index_major].size() : 0; }
          * wallet_rpc_server: THROW_WALLET_EXCEPTION_IF(i >= m_wallet->get_num_subaddresses(req.account_index), error::address_index_outofbound);
          */
-        var preferredAddress = await this.TryGetPreferredAddressAsync(context, post, accountIndex, token);
-        if (preferredAddress.TryUnwrapValue(out var preferred))
+        var preferredAddressResult = await this.TryGetUnusedAccountSubaddressAsync(context, post, accountIndex, subaddressIndex: (uint)post.Number, token);
+        if (preferredAddressResult.TryUnwrapValue(out var preferred))
         {
             return Option.Some(preferred);
         }
 
         this.logger.LogWarning(
-            "The preferred donation address ({@Address}) for post {@Post} could not be determined, or, is not available and so fallback address will be generated for use",
-            preferred,
+            "The preferred donation address for post {@Post} could not be determined, or, is not available and so fallback address will be generated for use",
             post);
 
-        /* after we enter the fallback zone we cannot 'cancel' the task, otherwise we risk creating addresses that
-         * never get used...
-         */
-        var createFallbackAddressRequest = new MoneroRpcRequest(
-            "create_address",
-            new CreateAddressParameters(accountIndex: accountIndex, count: 1, label: string.Empty));
-        var createFallbackAddressResponse = await this.wallet.JsonRpcAsync<CreateAddressResult>(createFallbackAddressRequest, CancellationToken.None);
-
-        if (createFallbackAddressResponse.Error is { } createFallbackErr)
+        /*
+        * The scenario where the loop executes multiple times is kind of an edge case. Essentially, if after having registered some bounties
+        * (posting QR code and associating an address) you delete the wallet cache and then post a bounty, it will try to re-use address
+        * at index 0 (because `create_address` just creates them from the last used index according to the cache). This is an issue because
+        * it would result in the address being used for multiple bounties! The database has a `CHECK` to prevent this being saved but best
+        * to nip the possibility in the bud here by _verifiying_ the address isn't in use. The problem here is that to get a valid unused address
+        * you need to call the `create_address` method `N+1` times where `N` is the number of bounties that were registered. The choice of `N+1`
+        * has _some_ logic but I am just adding an upper bound on how many times it tries (a `do { } (while true);` is conceptually the
+        * most appropriate - I just didn't want to leave an unbounded loop). If it fails to find an address it will go to the `RegisterNewBounty` branch
+        * that logs it can't create an address and then move onto the next bounty. So in this way it will reach a usable bounty address eventually...
+        */
+        for (var attempt = 1; attempt <= post.Number + 1; attempt++)
         {
-            this.logger.LogCritical(
-                "Failed to create a fallback donation address for {@Post}: {@WalletRpcError}",
+            this.logger.LogInformation(
+                "Trying to create a donation address for post #{PostNumber} (currently on attempt #{AttemptNumber})",
                 post.Number,
-                createFallbackErr);
+                attempt);
+
+            var createAddressRequest = new MoneroRpcRequest(
+                "create_address",
+                new CreateAddressParameters(accountIndex: accountIndex, count: 1, label: string.Empty));
+            var createAddressResponse = await this.wallet.JsonRpcAsync<CreateAddressResult>(createAddressRequest, CancellationToken.None);
+
+            if (createAddressResponse.Error is { } error)
+            {
+                this.logger.LogCritical(
+                    "Failed to create a donation address for {@Post} due to a wallet RPC error: {@WalletRpcError}",
+                    post.Number,
+                    error);
+                return Option.None<IndexedAddress>();
+            }
+
+            if (createAddressResponse.Result?.Addresses?.Count is not > 0
+                || createAddressResponse.Result.AddressIndices?.Count is not > 0)
+            {
+                this.logger.LogCritical("Failed to create a dontaion address for {@Post} - the RPC server responded but with no result", post);
+                return Option.None<IndexedAddress>();
+            }
+
+            var address = createAddressResponse.Result.Addresses.First();
+            var index = createAddressResponse.Result.AddressIndices.First();
+
+            var unusedAddressResult = await this.TryGetUnusedAccountSubaddressAsync(context, post, accountIndex, subaddressIndex: index, token);
+            if (unusedAddressResult.TryUnwrapValue(out var unusedAdddres))
+            {
+                this.logger.LogInformation(
+                    "Created donation address {Address} for {@Post}",
+                    unusedAdddres,
+                    post);
+                return Option.Some(unusedAdddres);
+            }
+            else
+            {
+                this.logger.LogInformation(
+                    "Attempt #{AttemptNumber} to create a donation address for post #{PostNumber} did not succeed because the address {Address} is " +
+                    "already in use.",
+                    attempt,
+                    post.Number,
+                    address);
+            }
         }
 
-        if (createFallbackAddressResponse.Result?.Addresses?.Count is not > 0
-            || createFallbackAddressResponse.Result.AddressIndices?.Count is not > 0)
-        {
-            this.logger.LogCritical("Failed to create a fallback address for {@Post} - the RPC server responded but with no result", post);
-            return Option.None<IndexedAddress>();
-        }
-
-        var fallbackAddress = createFallbackAddressResponse.Result.Addresses.First();
-        var fallbackIndex = createFallbackAddressResponse.Result.AddressIndices.First();
-        this.logger.LogInformation(
-            "Created fallback address {Address} for {@Post}",
-            fallbackAddress,
-            post);
-        return Option.Some(new IndexedAddress(fallbackAddress, accountIndex, fallbackIndex));
+        this.logger.LogCritical(
+            "All attempts to create a donation address for post #{PostNumber} failed",
+            post.Number);
+        return Option.None<IndexedAddress>();
     }
 
-    private async Task<Option<IndexedAddress>> TryGetPreferredAddressAsync(MoneroBotContext context, Post post, uint accountIndex, CancellationToken token = default)
+    private async Task<Option<IndexedAddress>> TryGetUnusedAccountSubaddressAsync(MoneroBotContext context, Post post, uint accountIndex, uint subaddressIndex, CancellationToken token = default)
     {
-        var subaddressIndex = (uint)post.Number;
-
         var getAddressRequest = new MoneroRpcRequest(
             "get_address",
             new GetAddressParameters(accountIndex, addressIndex: new List<uint> { subaddressIndex }));
@@ -237,8 +269,8 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
 
         if (getAddressResponse.Error is { } getAddressErr)
         {
-            this.logger.LogCritical(
-                "Failed to retrieve the the address belonging to account #{AccountNumber} at index {SubaddressIndex} which is the preferred donation address for post {@Post}: {@WalletRpcError}",
+            this.logger.LogError(
+                "Failed to retrieve the the address belonging to account #{AccountNumber} at index {SubaddressIndex} for post #{PostNumber}: {@WalletRpcError}",
                 accountIndex,
                 subaddressIndex,
                 post,
@@ -248,72 +280,72 @@ public class RegisterNewBountyHandler : IRegisterNewBountyHandler
 
         if (getAddressResponse.Result is null || getAddressResponse.Result.Addresses?.Count is not > 0)
         {
-            this.logger.LogCritical(
-                "Failed to retrieve the the address belonging to account #{AccountNumber} at index {SubaddressIndex} which is the preferred donation address for post {@Post} - the RPC server responded but with no result",
+            this.logger.LogError(
+                "Failed to retrieve the the address belonging to account #{AccountNumber} at index {SubaddressIndex} for post {@Post} - the RPC server responded but with no result",
                 accountIndex,
                 subaddressIndex,
                 post);
             return Option.None<IndexedAddress>();
         }
 
-        var preferredAddress = getAddressResponse.Result.Addresses.First();
+        var address = getAddressResponse.Result.Addresses.First();
         var getBalanceRequest = new MoneroRpcRequest(
             "get_balance",
-            new GetBalanceParameters(accountIndex, new HashSet<uint> { preferredAddress.AddressIndex }, allAccounts: false, strict: true));
+            new GetBalanceParameters(accountIndex, new HashSet<uint> { address.AddressIndex }, allAccounts: false, strict: true));
         var getBalanceResponse = await this.wallet.JsonRpcAsync<GetBalanceResult>(getBalanceRequest, token);
 
         if (getBalanceResponse.Error is { } getBalanceErr)
         {
             this.logger.LogCritical(
-                "Failed to get the balance of the preferred donation address {@Address} which is required to verify that it is not already in use, so that it can be used as the donation address for {@Post}: {@WalletRpcError}",
-                preferredAddress,
+                "Failed to get the balance of the donation address {@Address} which is required to verify that it is not already in use, so that it can be used as the donation address for {@Post}: {@WalletRpcError}",
+                address,
                 post,
                 getBalanceErr);
             return Option.None<IndexedAddress>();
         }
 
-        var preferredAddressBalance = getBalanceResponse.Result
+        var balance = getBalanceResponse.Result
             ?.PerSubaddress
-            ?.SingleOrDefault(i => i.Address == preferredAddress.Address);
+            ?.SingleOrDefault(i => i.Address == address.Address);
 
-        if (preferredAddressBalance is null)
+        if (balance is null)
         {
             this.logger.LogCritical(
-                "Failed to get the balance of the preferred donation address {@Address} which is required to verify that it is not already in use, so that it can be used as the donation address for {@Post} - the RPC server responded but with no result",
-                preferredAddress,
+                "Failed to get the balance of the donation address {@Address} which is required to verify that it is not already in use, so that it can be used as the donation address for {@Post} - the RPC server responded but with no result",
+                address,
                 post);
             return Option.None<IndexedAddress>();
         }
 
-        if (preferredAddressBalance.Balance is > 0)
+        if (balance.Balance is > 0)
         {
             this.logger.LogWarning(
-                "The preferred donation address {@Address} for {@Post} is already in use with a balance of {@Balance}",
-                preferredAddress,
-                post,
-                preferredAddressBalance);
+                "The donation address {@Address} is already in use with a balance of {@Balance} and so it cannot be used for post {@Post}",
+                address,
+                balance,
+                post);
             return Option.None<IndexedAddress>();
         }
 
         var alreadyTakenByPost = await context.DonationAddresses
-            .Where(da => da.Address == preferredAddress.Address)
+            .Where(da => da.Address == address.Address)
             .Select(da => new {da.Bounty!.PostNumber, da.Bounty.Slug})
             .FirstOrDefaultAsync(CancellationToken.None);
         if (alreadyTakenByPost is not null)
         {
             this.logger.LogWarning(
-                "The preferred donation address {Address} for post {@Post} is already in use by another post {@OtherPost}",
-                preferredAddress.Address,
-                post,
-                alreadyTakenByPost);
+                "The donation address {Address} is already in use by another post {@OtherPost} and so cannot be used for post {@Post}",
+                address.Address,
+                alreadyTakenByPost,
+                post);
             return Option.None<IndexedAddress>();
         }
 
         this.logger.LogInformation(
-            "The preferred donation address {Address} for {@Post} is available",
-            preferredAddress.Address,
+            "The donation address {Address} for {@Post} is available for use",
+            address.Address,
             post);
-        return Option.Some(new IndexedAddress(preferredAddress.Address, accountIndex, preferredAddress.AddressIndex));
+        return Option.Some(new IndexedAddress(address.Address, accountIndex, address.AddressIndex));
     }
 
     private record IndexedAddress(string Address, uint Major, uint Minor);

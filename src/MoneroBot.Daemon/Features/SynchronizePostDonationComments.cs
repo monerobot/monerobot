@@ -115,11 +115,18 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
             return;
         }
 
-        var comments =
-            (await this.getDonationComments.HandleAsync(new GetDonationComments((int)command.PostNumber), token))
-            .OrderBy(c => c.CommentId)
+        var comments = (await this.getDonationComments.HandleAsync(new GetDonationComments((int)command.PostNumber), token))
+            ?.OrderBy(c => c.CommentId)
             .Select(c => new Comment(CommentId: c.CommentId, Content: c.Content))
             .ToList();
+        if (comments is null)
+        {
+            this.logger.LogError(
+                "Failed to fetch the list of dontion comments for post #{PostNumber} and so cannot be synchronized",
+                command.PostNumber);
+            return;
+        }
+
         var donations = transfers
             .Select((t, i) => t switch
             {
@@ -278,7 +285,7 @@ public class SynchronizePostDonationCommentsHandler : ISynchronizePostDonationCo
                     var commentId = await this.fider.PostCommentAsync(
                         (int)command.PostNumber,
                         create.Content,
-                        new List<ImageUpload>(),
+                        [],
                         CancellationToken.None);
                     await ApplyEditToDbEntityAsync(create, commentId);
                     break;
